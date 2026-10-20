@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaType: High School Swimming Typing Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        pool: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                            950: '#042f2e',
+                        },
+                        neonCyan: '#00f3ff',
+                        neonGold: '#ffd700',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Post-Race Breakdown -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;800&display=swap');
+
+        /* Water wave animation background */
+        .water-bg {
+            background: linear-gradient(180deg, #0284c7 0%, #0369a1 50%, #0f172a 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .wave-layer {
+            position: absolute;
+            width: 200%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(255, 255, 255, 0.03) 0px,
+                rgba(255, 255, 255, 0.03) 20px,
+                transparent 20px,
+                transparent 40px
+            );
+            animation: waveMove 12s linear infinite;
+        }
+
+        @keyframes waveMove {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* Swimming Pool Lane Styling */
+        .lane-line {
+            background: repeating-linear-gradient(
+                90deg,
+                #ef4444 0px, #ef4444 15px,
+                #ffffff 15px, #ffffff 30px,
+                #3b82f6 30px, #3b82f6 45px,
+                #ffffff 45px, #ffffff 60px
+            );
+            height: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .pool-floor-grid {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+        }
+
+        /* Swimmer Stroke Animation */
+        @keyframes swimmerStroke {
+            0%, 100% { transform: scaleY(1) rotate(0deg); }
+            50% { transform: scaleY(0.92) rotate(2deg); }
+        }
+        .swimming-active {
+            animation: swimmerStroke 0.4s infinite ease-in-out;
+        }
+
+        /* Splash Effect Particle */
+        .splash-particle {
+            position: absolute;
+            pointer-events: none;
+            background: radial-gradient(circle, #38bdf8 0%, rgba(255,255,255,0.8) 100%);
+            border-radius: 50%;
+            animation: splashAnim 0.6s ease-out forwards;
+        }
+
+        @keyframes splashAnim {
+            0% { transform: scale(0.2) translate(0, 0); opacity: 1; }
+            100% { transform: scale(2.5) translate(var(--dx), var(--dy)); opacity: 0; }
+        }
+
+        /* Float Word Animation on Clear */
+        .word-pop-effect {
+            animation: popUpFade 0.7s ease-out forwards;
+        }
+
+        @keyframes popUpFade {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            50% { opacity: 0.9; transform: translateY(-25px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-45px) scale(1.4); }
+        }
+
+        /* Typing Caret & Highlight */
+        .caret {
+            border-right: 3px solid #00f3ff;
+            animation: blink 0.9s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { border-color: #00f3ff; }
+            50% { border-color: transparent; }
+        }
+
+        /* Custom scrollbar for typing zone */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0284c7;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0369a1;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans h-full flex flex-col select-none overflow-x-hidden">
+
+    <!-- TOP HEADER / NAV BAR -->
+    <header class="bg-slate-900/90 border-b border-cyan-800/40 backdrop-blur-md px-4 py-3 sticky top-0 z-50 flex flex-wrap justify-between items-center gap-3 shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-cyan-500 to-blue-600 p-2.5 rounded-xl shadow-lg shadow-cyan-500/20 text-white">
+                <i class="fa-solid font-bold fa-person-swimming text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400 bg-clip-text text-transparent">
+                    AQUATYPE <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">HS EDITION</span>
+                </h1>
+                <p class="text-xs text-slate-400">High School Swimming Typing Simulator</p>
+            </div>
+        </div>
+
+        <!-- STATS BANNER DURING RACE -->
+        <div id="liveStatsHeader" class="hidden flex items-center space-x-4 sm:space-x-6 bg-slate-950/80 px-4 py-1.5 rounded-xl border border-cyan-900/50 font-mono text-sm">
+            <div class="text-center">
+                <span class="text-xs text-slate-400 block uppercase tracking-wider">Speed</span>
+                <span id="liveWpm" class="text-cyan-400 font-bold text-lg">0</span> <span class="text-xs text-slate-400">WPM</span>
+            </div>
+            <div class="h-6 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-xs text-slate-400 block uppercase tracking-wider">Accuracy</span>
+                <span id="liveAcc" class="text-teal-300 font-bold text-lg">100%</span>
+            </div>
+            <div class="h-6 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-xs text-slate-400 block uppercase tracking-wider">Time</span>
+                <span id="liveTimer" class="text-yellow-400 font-bold text-lg">00:00</span>
+            </div>
+            <div id="liveLapContainer" class="h-6 w-px bg-slate-800"></div>
+            <div id="liveLapBox" class="text-center">
+                <span id="liveLapLabel" class="text-xs text-slate-400 block uppercase tracking-wider">Lap</span>
+                <span id="liveLap" class="text-purple-400 font-bold text-lg">1/1</span>
+            </div>
+            <div id="liveStreakBox" class="hidden text-center pl-2 border-l border-slate-800">
+                <span class="text-xs text-amber-400 block uppercase tracking-wider"><i class="fa-solid fa-fire"></i> Streak</span>
+                <span id="liveStreak" class="text-amber-400 font-extrabold text-lg">0x</span>
+            </div>
+        </div>
+
+        <!-- AUDIO & CONTROLS -->
+        <div class="flex items-center space-x-3">
+            <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 transition border border-slate-700" title="Toggle Sound Effects">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-lg"></i>
+            </button>
+            <button onclick="showLeaderboard()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 text-sm font-semibold transition border border-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-trophy"></i> <span class="hidden sm:inline">Scoreboard</span>
+            </button>
+            <button onclick="resetToMenu()" class="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-sm transition shadow-md shadow-cyan-600/30">
+                <i class="fa-solid fa-swatchbook mr-1"></i> Setup Race
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-1 flex flex-col max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
+
+        <!-- SETUP PANEL / MENU (Visible by default) -->
+        <section id="setupPanel" class="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 shadow-2xl backdrop-blur-md space-y-6">
+            <div class="border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <i class="fa-solid fa-sliders text-cyan-400"></i> Swim Meet Configuration
+                </h2>
+                <p class="text-sm text-slate-400 mt-1">Select your event mode, swim vocabulary category, and difficulty standard to take your mark on the blocks.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- 1. MODE SELECTION -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-cyan-400">1. Game Mode</label>
+                    <div class="grid grid-cols-1 gap-2.5">
+                        <button onclick="selectMode('vocab')" id="mode-vocab" class="mode-btn active p-3 rounded-xl border border-cyan-500/80 bg-cyan-950/40 text-left transition flex items-start gap-3 hover:border-cyan-400">
+                            <i class="fa-solid fa-bolt text-amber-400 text-xl mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100 flex items-center gap-2">
+                                    Vocab Flash Cards <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-1.5 py-0.2 rounded uppercase">New</span>
+                                </div>
+                                <div class="text-xs text-slate-400">Single swim terms burst cards. Build perfect stroke streak combos!</div>
+                            </div>
+                        </button>
+                        <button onclick="selectMode('laps')" id="mode-laps" class="mode-btn p-3 rounded-xl border border-slate-800 bg-slate-950/40 text-left transition flex items-start gap-3 hover:border-cyan-400">
+                            <i class="fa-solid fa-flag-checkered text-cyan-400 text-xl mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100">Laps Race (Sentences)</div>
+                                <div class="text-xs text-slate-400">Race against AI pace swimmers across full swimming passages.</div>
+                            </div>
+                        </button>
+                        <button onclick="selectMode('interval')" id="mode-interval" class="mode-btn p-3 rounded-xl border border-slate-800 bg-slate-950/40 text-left transition flex items-start gap-3 hover:border-cyan-400">
+                            <i class="fa-solid fa-stopwatch text-yellow-400 text-xl mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100">Interval Training</div>
+                                <div class="text-xs text-slate-400">Sprint sets with strict rest clocks and cutoff WPM goals.</div>
+                            </div>
+                        </button>
+                        <button onclick="selectMode('endurance')" id="mode-endurance" class="mode-btn p-3 rounded-xl border border-slate-800 bg-slate-950/40 text-left transition flex items-start gap-3 hover:border-cyan-400">
+                            <i class="fa-solid fa-water text-teal-400 text-xl mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100">Endurance Swim</div>
+                                <div class="text-xs text-slate-400">Continuous typing with steadily increasing current speed.</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. CONTENT CATEGORY & VOCAB OPTIONS -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-cyan-400">2. Vocabulary / Topic Category</label>
+                    <select id="categorySelect" onchange="handleCategoryChange()" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 focus:outline-none focus:border-cyan-400 text-sm">
+                        <option value="all_vocab">All High School Swim Vocabulary (Combined)</option>
+                        <option value="strokes">Strokes & Mechanics (Flip Turn, Streamline, etc.)</option>
+                        <option value="gear">Deck Gear & Equipment (Paddles, Buoy, Cap)</option>
+                        <option value="physiology">Training & Physiology (Taper, Aerobic, Split)</option>
+                        <option value="events">Events & High School Scoring (Relay, Cut, IM)</option>
+                        <option value="terminology">Full Paragraphs: Swim Team Rules</option>
+                        <option value="olympians">Full Paragraphs: Famous Olympians</option>
+                        <option value="highschool">Full Paragraphs: HS & College Lore</option>
+                        <option value="science">Full Paragraphs: Science of Hydrodynamics</option>
+                        <option value="custom">Custom Notes (Paste your own)</option>
+                    </select>
+
+                    <!-- VOCAB SPRINT TARGET TYPE SELECTOR (ONLY FOR VOCAB MODE) -->
+                    <div id="vocabGoalContainer" class="mt-3 space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-cyan-400">Vocab Set Length / Target</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="selectVocabTarget('20_words')" id="vgoal-20_words" class="vgoal-btn py-2 text-xs font-bold rounded-lg border border-cyan-500 bg-cyan-950/60 text-cyan-300">20 Words</button>
+                            <button onclick="selectVocabTarget('40_words')" id="vgoal-40_words" class="vgoal-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">40 Words</button>
+                            <button onclick="selectVocabTarget('30_sec')" id="vgoal-30_sec" class="vgoal-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">30s Sprint</button>
+                            <button onclick="selectVocabTarget('60_sec')" id="vgoal-60_sec" class="vgoal-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">60s Sprint</button>
+                        </div>
+                    </div>
+
+                    <!-- CUSTOM TEXT INPUT (Hidden by default) -->
+                    <div id="customTextContainer" class="hidden mt-2">
+                        <textarea id="customTextInput" rows="3" placeholder="Paste your practice set notes, swimming terms, or custom text here..." class="w-full bg-slate-950 border border-cyan-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 font-mono"></textarea>
+                    </div>
+
+                    <!-- DISTANCE / LAPS SELECTOR (FOR PARAGRAPH MODES) -->
+                    <div id="distanceSelectorContainer" class="hidden mt-3 space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-cyan-400">Race Event Distance</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="selectDistance(50)" id="dist-50" class="dist-btn py-2 text-xs font-bold rounded-lg border border-cyan-500 bg-cyan-950/60 text-cyan-300">50m (1 Lap)</button>
+                            <button onclick="selectDistance(100)" id="dist-100" class="dist-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">100m (2 Laps)</button>
+                            <button onclick="selectDistance(200)" id="dist-200" class="dist-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">200m (4 Laps)</button>
+                            <button onclick="selectDistance(400)" id="dist-400" class="dist-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">400m (8 Laps)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. AI GHOST DIFFICULTY & START BUTTON -->
+                <div class="space-y-3 flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-cyan-400">3. Target Pace / Competitors</label>
+                        <select id="difficultySelect" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 focus:outline-none focus:border-cyan-400 text-sm">
+                            <option value="35">Novice Swimmer Pace (35 WPM Target)</option>
+                            <option value="55" selected>Varsity Letter Standard (55 WPM Target)</option>
+                            <option value="75">State Qualifier Pace (75 WPM Target)</option>
+                            <option value="95">All-American Championship Pace (95 WPM Target)</option>
+                            <option value="115">Olympic Trials Pace (115 WPM Target)</option>
+                        </select>
+
+                        <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-400 space-y-1">
+                            <div class="flex justify-between"><span>Varsity Cut:</span> <span class="text-cyan-400 font-bold">50+ WPM</span></div>
+                            <div class="flex justify-between"><span>State Cut:</span> <span class="text-teal-400 font-bold">75+ WPM</span></div>
+                            <div class="flex justify-between"><span>All-American:</span> <span class="text-amber-400 font-bold">95+ WPM</span></div>
+                        </div>
+                    </div>
+
+                    <button onclick="startRace()" class="w-full py-4 bg-gradient-to-r from-cyan-500 via-teal-400 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-lg rounded-xl shadow-lg shadow-cyan-500/20 uppercase tracking-wider transform transition active:scale-[0.98] flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> Take Your Mark & Start!
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- COUNTDOWN OVERLAY -->
+        <div id="countdownOverlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center">
+            <p class="text-cyan-400 uppercase tracking-widest text-sm font-bold mb-2">Swimmers, On Your Marks...</p>
+            <div id="countdownNumber" class="text-8xl font-black text-amber-400 font-mono animate-bounce">3</div>
+            <p class="text-xs text-slate-500 mt-4">Get ready to type as soon as the horn sounds!</p>
+        </div>
+
+        <!-- RACE ARENA (Visual Pool Lanes + Typing Interface) -->
+        <section id="raceArena" class="hidden flex-1 flex flex-col space-y-4">
+            
+            <!-- SWIMMING POOL VISUAL TRACK -->
+            <div class="water-bg rounded-2xl border-2 border-cyan-600/40 p-4 shadow-2xl relative overflow-hidden flex flex-col justify-around min-h-[200px]">
+                <div class="wave-layer"></div>
+                <div class="pool-floor-grid absolute inset-0 pointer-events-none"></div>
+
+                <!-- LANE 1: AI GHOST 1 / PACE -->
+                <div class="relative z-10 my-1.5">
+                    <div class="flex justify-between text-[10px] font-mono text-cyan-200/70 mb-0.5 px-1">
+                        <span>LANE 1: AI PACE GHOST</span>
+                        <span id="ghost1Stats" class="font-bold">0 WPM</span>
+                    </div>
+                    <div class="lane-line rounded-full my-0.5 opacity-80"></div>
+                    <div class="relative h-9 w-full bg-slate-900/40 rounded-lg overflow-hidden border border-white/10">
+                        <!-- Marker end line -->
+                        <div class="absolute right-3 top-0 bottom-0 w-1 bg-red-500/80 z-10" title="Finish Line"></div>
+                        <!-- Swimmer Sprite -->
+                        <div id="swimmerGhost" class="absolute left-0 top-1/2 -translate-y-1/2 transition-all duration-300 flex items-center space-x-1" style="left: 0%;">
+                            <div class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold whitespace-nowrap">
+                                Ghost Pace
+                            </div>
+                            <svg class="w-7 h-7 text-amber-400 filter drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M13,6.5A1.5,1.5 0 0,0 11.5,8A1.5,1.5 0 0,0 13,9.5A1.5,1.5 0 0,0 14.5,8A1.5,1.5 0 0,0 13,6.5M7,12C7,11.4 7.4,11 8,11H12.5L15,8.5C15.4,8.1 16,8.1 16.4,8.5C16.8,8.9 16.8,9.5 16.4,9.9L13.5,12.8C13.1,13.2 12.5,13.2 12.1,12.8L10.5,11.2V16C10.5,16.6 10.1,17 9.5,17C8.9,17 8.5,16.6 8.5,16V13H8C7.4,13 7,12.6 7,12Z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LANE 2: USER SWIMMER -->
+                <div class="relative z-10 my-1.5">
+                    <div class="flex justify-between text-[10px] font-mono text-cyan-200 mb-0.5 px-1">
+                        <span class="font-bold text-cyan-300"><i class="fa-solid fa-star text-amber-400"></i> LANE 2: YOU</span>
+                        <span id="userSwimmerStats" class="font-bold text-cyan-300">0 WPM | 0m</span>
+                    </div>
+                    <div class="lane-line rounded-full my-0.5"></div>
+                    <div id="userPoolLane" class="relative h-11 w-full bg-cyan-950/50 rounded-lg overflow-hidden border border-cyan-400/30">
+                        <div class="absolute right-3 top-0 bottom-0 w-1.5 bg-red-500 z-10 shadow-[0_0_8px_#ef4444]" title="Touch Pad Finish"></div>
+                        
+                        <!-- User Swimmer Sprite -->
+                        <div id="swimmerUser" class="absolute left-0 top-1/2 -translate-y-1/2 transition-all duration-200 flex items-center space-x-1" style="left: 0%;">
+                            <div class="bg-cyan-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full shadow-md font-mono whitespace-nowrap">
+                                YOU
+                            </div>
+                            <div class="relative">
+                                <svg class="w-8 h-8 text-cyan-300 filter drop-shadow-[0_0_8px_rgba(0,243,255,0.8)] swimming-active" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M20.5,5A1.5,1.5 0 0,0 19,6.5A1.5,1.5 0 0,0 20.5,8A1.5,1.5 0 0,0 22,6.5A1.5,1.5 0 0,0 20.5,5M1,12C2.33,12 3.23,12.5 4,13C4.77,13.5 5.67,14 7,14C8.33,14 9.23,13.5 10,13C10.77,12.5 11.67,12 13,12C14.33,12 15.23,12.5 16,13C16.77,13.5 17.67,14 19,14C20.33,14 21.23,13.5 22,13V15C20.67,15 19.77,14.5 19,14C18.23,13.5 17.33,13 16,13C14.67,13 13.77,13.5 13,14C12.23,14.5 11.33,15 10,15C8.67,15 7.77,14.5 7,14C6.23,13.5 5.33,13 4,13C2.67,13 1.77,13.5 1,14V12M13.5,6.25C12.9,6.25 12.33,6.5 11.9,6.9L8.7,10.1L9.8,11.2L12.4,8.6L14.2,10.4L10,14.6L11.4,16L16.3,11.1C16.7,10.7 16.9,10.1 16.8,9.5C16.6,8.8 16.1,8.3 15.4,8.1L13.5,6.25Z"/>
+                                </svg>
+                                <div id="dragIndicator" class="hidden absolute -left-6 top-0 text-red-400 text-xs font-bold font-mono animate-ping">
+                                    DRAG!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TYPING PRACTICE DISPLAY AREA -->
+            <div class="bg-slate-900 border-2 border-slate-800 focus-within:border-cyan-500 rounded-2xl p-6 shadow-2xl relative flex flex-col justify-center">
+                
+                <!-- PROGRESS BAR -->
+                <div class="w-full bg-slate-950 h-2 rounded-full mb-4 overflow-hidden border border-slate-800">
+                    <div id="textProgressBar" class="bg-gradient-to-r from-cyan-500 to-teal-300 h-full w-0 transition-all duration-150"></div>
+                </div>
+
+                <!-- PASSAGE / FLASHCARD DISPLAY -->
+                <div id="vocabCardDisplay" class="hidden flex flex-col items-center justify-center py-6 space-y-3 relative">
+                    <!-- FLOATING POP EFFECTS CONTAINER -->
+                    <div id="popFxContainer" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+
+                    <div class="text-xs uppercase font-mono tracking-widest text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-water text-cyan-400"></i> Swim Term Target
+                    </div>
+                    
+                    <!-- CURRENT FLASHCARD WORD -->
+                    <div id="flashcardWord" class="font-mono text-3xl sm:text-5xl font-black text-cyan-300 tracking-wider bg-slate-950/90 border border-cyan-800/80 px-8 py-4 rounded-2xl shadow-inner min-w-[280px] text-center select-none">
+                        <!-- Word chars injected -->
+                    </div>
+
+                    <!-- UPCOMING PREVIEW WORD -->
+                    <div class="text-xs font-mono text-slate-500">
+                        Next Term: <span id="nextVocabWord" class="text-slate-300 font-bold">---</span>
+                    </div>
+                </div>
+
+                <!-- STANDARD PARAGRAPH TYPING DISPLAY -->
+                <div id="typingTextDisplay" class="font-mono text-lg sm:text-xl leading-relaxed text-slate-400 max-h-48 overflow-y-auto p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 tracking-wide select-none">
+                    <!-- Dynamic text injected here -->
+                </div>
+
+                <!-- HIDDEN INPUT RECEIVER -->
+                <input type="text" id="hiddenTypingInput" class="opacity-0 absolute inset-0 cursor-default" autocomplete="off" capitalize="off" spellcheck="false">
+
+                <!-- HELPER PROMPT -->
+                <div class="mt-4 flex justify-between items-center text-xs text-slate-500 font-mono">
+                    <span id="typingHelperText"><i class="fa-solid fa-keyboard text-cyan-400 mr-1"></i> Type the text above. Space/Enter to advance.</span>
+                    <span id="lapStatusTag" class="text-cyan-400 font-bold">Lap 1 of 1</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- POST-RACE PERFORMANCE ANALYTICS BREAKDOWN -->
+        <section id="resultsPanel" class="hidden bg-slate-900/90 rounded-2xl border border-slate-800 p-6 shadow-2xl backdrop-blur-md space-y-6">
+            <div class="flex flex-wrap justify-between items-center border-b border-slate-800 pb-4 gap-4">
+                <div>
+                    <div id="resultBadge" class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2">
+                        State Qualifier Cut Achieved!
+                    </div>
+                    <h2 class="text-3xl font-black text-white">Race Official Time & Results</h2>
+                </div>
+                <button onclick="resetToMenu()" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm transition shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Swim Next Event
+                </button>
+            </div>
+
+            <!-- KEY METRICS CARDS -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Final Net Speed</span>
+                    <span id="resWpm" class="text-3xl font-extrabold text-cyan-400 font-mono">0</span>
+                    <span class="text-xs text-slate-500 block">WPM</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Stroke Accuracy</span>
+                    <span id="resAcc" class="text-3xl font-extrabold text-teal-300 font-mono">0%</span>
+                    <span class="text-xs text-slate-500 block">Precision</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Official Swim Time</span>
+                    <span id="resTime" class="text-3xl font-extrabold text-amber-400 font-mono">00:00</span>
+                    <span class="text-xs text-slate-500 block">Minutes:Seconds</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Max Streak / Drag</span>
+                    <span id="resErrors" class="text-3xl font-extrabold text-purple-400 font-mono">0</span>
+                    <span id="resErrorsLabel" class="text-xs text-slate-500 block">Max Streak</span>
+                </div>
+            </div>
+
+            <!-- SPLIT TIMES & CHART -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-chart-line text-cyan-400"></i> Speed Progression (WPM Over Time)</h3>
+                    <div class="h-64">
+                        <canvas id="wpmChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col">
+                    <h3 id="splitsListTitle" class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-stopwatch text-amber-400"></i> Lap Split Times</h3>
+                    <div id="splitTimesList" class="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1 text-sm font-mono">
+                        <!-- Dynamic splits -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCOREBOARD / LEADERBOARD MODAL -->
+        <div id="leaderboardModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h3 class="text-xl font-extrabold text-amber-400 flex items-center gap-2">
+                        <i class="fa-solid fa-trophy"></i> High School Swim Meet Scoreboard
+                    </h3>
+                    <button onclick="hideLeaderboard()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+
+                <div class="overflow-y-auto max-h-80">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="text-slate-400 border-b border-slate-800 uppercase">
+                            <tr>
+                                <th class="p-2">#</th>
+                                <th class="p-2">Event</th>
+                                <th class="p-2">WPM</th>
+                                <th class="p-2">Acc</th>
+                                <th class="p-2">Cut Standard</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardRows" class="divide-y divide-slate-800/50">
+                            <!-- Injected leaderboard content -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="hideLeaderboard()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-950 border-t border-slate-800/80 py-4 px-6 text-center text-xs text-slate-500 font-mono">
+        AquaType HS Swim Simulator &bull; Designed for High School Swimming Typing Drills
+    </footer>
+
+    <!-- JS GAME LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. DATA PRESETS & VOCABULARY BANK
+           ========================================================================== */
+        const VOCAB_BANK = {
+            strokes: [
+                "streamline", "flip turn", "dolphin kick", "freestyle", "backstroke", "breaststroke",
+                "butterfly", "catch-up", "high elbow", "body roll", "bilateral", "sculling",
+                "whip kick", "flutter kick", "underwater", "open turn", "stroke rate", "tempo"
+            ],
+            gear: [
+                "paddles", "kickboard", "pull buoy", "fins", "snorkel", "goggles", "swim cap",
+                "touchpad", "pace clock", "lane line", "starting block", "chamois", "parka", "tech suit"
+            ],
+            physiology: [
+                "aerobic", "anaerobic", "lactate", "threshold", "vo2 max", "taper", "interval",
+                "split", "descending", "negative split", "warm-down", "hypoxic", "heart rate", "recovery"
+            ],
+            events: [
+                "medley", "individual medley", "relay", "seed time", "cut", "psych sheet",
+                "disqualification", "varsity", "all american", "prelims", "finals", "touch pad", "anchor"
+            ]
+        };
+
+        const PASSAGES = {
+            terminology: [
+                "Streamline off the wall is the fastest position a swimmer can maintain underwater. Pushing off in a tight streamline with hands stacked and head tucked reduces passive drag significantly before initiating underwater butterfly kicks.",
+                "An Individual Medley, or IM, requires the swimmer to compete in all four competitive strokes in a single race. The official NFHS order for the IM is butterfly, backstroke, breaststroke, and freestyle.",
+                "Tapering is the training phase prior to the championship swim meet where yardage is reduced while maintaining high intensity. This allows muscle tissue to rebuild, optimizing power and stroke tempo for peak performance.",
+                "A flip turn is executed at the pool wall during freestyle and backstroke races. Swimmers somersault forward, plant both feet firmly against the touchpad, and explode into a tight streamline position on their back or side."
+            ],
+            olympians: [
+                "Michael Phelps is the most decorated Olympian of all time, holding twenty-eight Olympic medals, including twenty-three gold medals. His iconic eight gold medal performance at the 2008 Beijing Olympics set world records in nearly every event.",
+                "Katie Ledecky has dominated distance freestyle swimming for over a decade. Holding world records in the four hundred, eight hundred, and fifteen hundred meter freestyle, her pacing strategy and stroke length remain unmatched."
+            ],
+            highschool: [
+                "High school dual meets bring unmatched energy to the deck as teammates line the pool edge, cheering passionately for relay anchors digging deep during the final twenty-five yards.",
+                "Qualifying for the State Championship meet requires achieving strict automatic or consideration cutoff times during sanctioned high school invitationals throughout the competitive season."
+            ],
+            science: [
+                "Hydrodynamic drag consists of frontal resistance, skin friction, and wave-making drag. Swimmers wear technical swimsuits and silicone caps to smooth body contours and reduce turbulent fluid dynamic friction.",
+                "Lactate threshold represents the intensity of exertion where lactic acid begins to accumulate in the bloodstream faster than it can be cleared, requiring precise physiological interval pacing during race sets."
+            ]
+        };
+
+        /* ==========================================================================
+           2. AUDIO SYNTHESIZER (Web Audio API)
+           ========================================================================== */
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            if (soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-lg';
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-lg text-slate-500';
+            }
+        }
+
+        function playKeyStrokeSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400 + Math.random() * 100, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function playSplashSound(pitch = 1) {
+            if (!soundEnabled) return;
+            initAudio();
+            const bufferSize = audioCtx.sampleRate * 0.15;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const whiteNoise = audioCtx.createBufferSource();
+            whiteNoise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800 * pitch, audioCtx.currentTime);
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            whiteNoise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            whiteNoise.start();
+        }
+
+        function playComboSound(streak) {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            const freq = 300 + (streak * 40);
+            osc.frequency.setValueAtTime(Math.min(1200, freq), audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
+        }
+
+        function playHornSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.6);
+        }
+
+        function playBeepSound(pitch = 440) {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        }
+
+        /* ==========================================================================
+           3. GAME STATE MANAGEMENT
+           ========================================================================== */
+        let state = {
+            mode: 'vocab', // vocab, laps, interval, endurance
+            category: 'all_vocab',
+            vocabTargetType: '20_words', // 20_words, 40_words, 30_sec, 60_sec
+            distance: 50, // meters
+            targetWpm: 55, // AI Pace
+            lapsTotal: 1,
+            currentLap: 1,
+            vocabList: [],
+            currentVocabIdx: 0,
+            fullText: '',
+            words: [],
+            currentWordIdx: 0,
+            currentCharIdx: 0,
+            totalTypedChars: 0,
+            errorCount: 0,
+            streak: 0,
+            maxStreak: 0,
+            wordsCompleted: 0,
+            startTime: null,
+            timerInterval: null,
+            ghostInterval: null,
+            timeLimitSec: 0,
+            ghostProgress: 0,
+            userProgress: 0,
+            wpmHistory: [],
+            splitTimes: [],
+            lapStartTime: null
+        };
+
+        /* UI Selection Handlers */
+        function selectMode(m) {
+            state.mode = m;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('border-cyan-500/80', 'bg-cyan-950/40');
+                btn.classList.add('border-slate-800', 'bg-slate-950/40');
+            });
+            const activeBtn = document.getElementById(`mode-${m}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-slate-800', 'bg-slate-950/40');
+                activeBtn.classList.add('border-cyan-500/80', 'bg-cyan-950/40');
+            }
+
+            const distContainer = document.getElementById('distanceSelectorContainer');
+            const vocabGoalContainer = document.getElementById('vocabGoalContainer');
+
+            if (m === 'vocab') {
+                vocabGoalContainer.classList.remove('hidden');
+                distContainer.classList.add('hidden');
+            } else if (m === 'endurance') {
+                vocabGoalContainer.classList.add('hidden');
+                distContainer.classList.add('hidden');
+            } else {
+                vocabGoalContainer.classList.add('hidden');
+                distContainer.classList.remove('hidden');
+            }
+        }
+
+        function selectVocabTarget(target) {
+            state.vocabTargetType = target;
+            document.querySelectorAll('.vgoal-btn').forEach(btn => {
+                btn.classList.remove('border-cyan-500', 'bg-cyan-950/60', 'text-cyan-300');
+                btn.classList.add('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+            });
+            const activeBtn = document.getElementById(`vgoal-${target}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-slate-800', 'text-slate-400');
+                activeBtn.classList.add('border-cyan-500', 'bg-cyan-950/60', 'text-cyan-300');
+            }
+        }
+
+        function selectDistance(dist) {
+            state.distance = dist;
+            state.lapsTotal = dist / 50;
+            document.querySelectorAll('.dist-btn').forEach(btn => {
+                btn.classList.remove('border-cyan-500', 'bg-cyan-950/60', 'text-cyan-300');
+                btn.classList.add('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+            });
+            const activeBtn = document.getElementById(`dist-${dist}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-slate-800', 'text-slate-400');
+                activeBtn.classList.add('border-cyan-500', 'bg-cyan-950/60', 'text-cyan-300');
+            }
+        }
+
+        function handleCategoryChange() {
+            const select = document.getElementById('categorySelect');
+            const customBox = document.getElementById('customTextContainer');
+            state.category = select.value;
+            if (select.value === 'custom') {
+                customBox.classList.remove('hidden');
+            } else {
+                customBox.classList.add('hidden');
+            }
+        }
+
+        /* Build Vocab Word Pool */
+        function getVocabWords() {
+            if (state.category === 'custom') {
+                const text = document.getElementById('customTextInput').value.trim();
+                const words = text.split(/\s+/).filter(w => w.length > 0);
+                return words.length > 0 ? words : ["streamline", "flip turn", "dolphin kick", "taper", "medley"];
+            }
+
+            if (state.category in VOCAB_BANK) {
+                return [...VOCAB_BANK[state.category]];
+            }
+
+            // All vocab
+            return [
+                ...VOCAB_BANK.strokes,
+                ...VOCAB_BANK.gear,
+                ...VOCAB_BANK.physiology,
+                ...VOCAB_BANK.events
+            ];
+        }
+
+        /* Generate Passage Text */
+        function buildPassageText() {
+            if (state.category === 'custom') {
+                const text = document.getElementById('customTextInput').value.trim();
+                return text.length > 20 ? text : "Swimming requires endurance, rhythm, discipline, and dedication to master every stroke in the pool.";
+            }
+            const pool = PASSAGES[state.category] || PASSAGES.terminology;
+            let text = "";
+            for (let i = 0; i < state.lapsTotal; i++) {
+                text += pool[i % pool.length] + " ";
+            }
+            return text.trim();
+        }
+
+        /* ==========================================================================
+           4. RACE ENGINE & COUNTDOWN
+           ========================================================================== */
+        function startRace() {
+            state.targetWpm = parseInt(document.getElementById('difficultySelect').value);
+            state.errorCount = 0;
+            state.streak = 0;
+            state.maxStreak = 0;
+            state.wordsCompleted = 0;
+            state.totalTypedChars = 0;
+            state.userProgress = 0;
+            state.ghostProgress = 0;
+            state.currentLap = 1;
+            state.wpmHistory = [];
+            state.splitTimes = [];
+
+            if (state.mode === 'vocab') {
+                let pool = getVocabWords();
+                // Shuffle pool
+                pool.sort(() => Math.random() - 0.5);
+                state.vocabList = pool;
+                state.currentVocabIdx = 0;
+
+                // Configure target length / time
+                if (state.vocabTargetType === '20_words') {
+                    state.vocabList = state.vocabList.slice(0, 20);
+                    state.timeLimitSec = 0;
+                } else if (state.vocabTargetType === '40_words') {
+                    while (state.vocabList.length < 40) {
+                        state.vocabList = state.vocabList.concat(pool.sort(() => Math.random() - 0.5));
+                    }
+                    state.vocabList = state.vocabList.slice(0, 40);
+                    state.timeLimitSec = 0;
+                } else if (state.vocabTargetType === '30_sec') {
+                    state.timeLimitSec = 30;
+                } else if (state.vocabTargetType === '60_sec') {
+                    state.timeLimitSec = 60;
+                }
+            } else {
+                state.fullText = buildPassageText();
+                state.words = state.fullText.split(' ');
+                state.currentWordIdx = 0;
+                state.currentCharIdx = 0;
+            }
+
+            // UI Adjustments
+            document.getElementById('setupPanel').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.add('hidden');
+            document.getElementById('countdownOverlay').classList.remove('hidden');
+
+            let countdown = 3;
+            const countNum = document.getElementById('countdownNumber');
+            countNum.innerText = countdown;
+            playBeepSound(440);
+
+            const timer = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    countNum.innerText = countdown;
+                    playBeepSound(440);
+                } else if (countdown === 0) {
+                    countNum.innerText = "TAKE YOUR MARK!";
+                    playBeepSound(660);
+                } else {
+                    clearInterval(timer);
+                    document.getElementById('countdownOverlay').classList.add('hidden');
+                    document.getElementById('raceArena').classList.remove('hidden');
+                    document.getElementById('liveStatsHeader').classList.remove('hidden');
+
+                    if (state.mode === 'vocab') {
+                        document.getElementById('liveStreakBox').classList.remove('hidden');
+                        document.getElementById('liveLapBox').classList.add('hidden');
+                        document.getElementById('liveLapContainer').classList.add('hidden');
+                    } else {
+                        document.getElementById('liveStreakBox').classList.add('hidden');
+                        document.getElementById('liveLapBox').classList.remove('hidden');
+                        document.getElementById('liveLapContainer').classList.remove('hidden');
+                    }
+
+                    playHornSound();
+                    initActualRace();
+                }
+            }, 900);
+        }
+
+        function initActualRace() {
+            state.startTime = Date.now();
+            state.lapStartTime = Date.now();
+
+            if (state.mode === 'vocab') {
+                document.getElementById('vocabCardDisplay').classList.remove('hidden');
+                document.getElementById('typingTextDisplay').classList.add('hidden');
+                document.getElementById('typingHelperText').innerHTML = `<i class="fa-solid fa-bolt text-amber-400 mr-1"></i> Type the swim term! Press Space or Enter to submit.`;
+                renderVocabCard();
+            } else {
+                document.getElementById('vocabCardDisplay').classList.add('hidden');
+                document.getElementById('typingTextDisplay').classList.remove('hidden');
+                document.getElementById('typingHelperText').innerHTML = `<i class="fa-solid fa-keyboard text-cyan-400 mr-1"></i> Type the passage text above. Space to advance.`;
+                renderTextDisplay();
+            }
+
+            setupInputListener();
+
+            // Main Stats & Ghost loop
+            state.timerInterval = setInterval(updateLiveStats, 200);
+            state.ghostInterval = setInterval(updateGhostPace, 300);
+        }
+
+        /* Render Vocab Flash Card Word */
+        function renderVocabCard() {
+            const word = state.vocabList[state.currentVocabIdx];
+            if (!word) {
+                finishRace();
+                return;
+            }
+
+            const card = document.getElementById('flashcardWord');
+            card.innerHTML = '';
+
+            word.split('').forEach((char, cIdx) => {
+                const span = document.createElement('span');
+                span.id = `vchar-${cIdx}`;
+                span.innerText = char === ' ' ? '\u00A0' : char;
+                span.className = 'text-slate-400 transition-colors';
+                card.appendChild(span);
+            });
+
+            // Update Next Word Preview
+            const nextWord = state.vocabList[state.currentVocabIdx + 1];
+            document.getElementById('nextVocabWord').innerText = nextWord || 'Final Word!';
+
+            // Reset input
+            const hiddenInput = document.getElementById('hiddenTypingInput');
+            hiddenInput.value = '';
+            state.currentCharIdx = 0;
+        }
+
+        /* Render Interactive Sentence Display */
+        function renderTextDisplay() {
+            const container = document.getElementById('typingTextDisplay');
+            container.innerHTML = '';
+
+            state.words.forEach((word, wIdx) => {
+                const wordSpan = document.createElement('span');
+                wordSpan.id = `word-${wIdx}`;
+                wordSpan.className = 'inline-block mr-2 my-1 rounded px-1 transition-colors';
+
+                word.split('').forEach((char, cIdx) => {
+                    const charSpan = document.createElement('span');
+                    charSpan.id = `char-${wIdx}-${cIdx}`;
+                    charSpan.innerText = char;
+                    wordSpan.appendChild(charSpan);
+                });
+
+                container.appendChild(wordSpan);
+            });
+
+            highlightCurrentWord();
+        }
+
+        function highlightCurrentWord() {
+            document.querySelectorAll('#typingTextDisplay > span').forEach(s => {
+                s.classList.remove('bg-cyan-900/40', 'border-b-2', 'border-cyan-400');
+            });
+
+            const current = document.getElementById(`word-${state.currentWordIdx}`);
+            if (current) {
+                current.classList.add('bg-cyan-900/40', 'border-b-2', 'border-cyan-400');
+                current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        /* Handle User Typing Inputs */
+        function setupInputListener() {
+            const hiddenInput = document.getElementById('hiddenTypingInput');
+            hiddenInput.value = '';
+            hiddenInput.focus();
+
+            document.getElementById('raceArena').onclick = () => hiddenInput.focus();
+
+            hiddenInput.oninput = (e) => {
+                if (state.mode === 'vocab') {
+                    handleVocabInput(hiddenInput);
+                } else {
+                    handleSentenceInput(hiddenInput);
+                }
+            };
+
+            // Enter key support for single word submit in vocab mode
+            hiddenInput.onkeydown = (e) => {
+                if (state.mode === 'vocab' && e.key === 'Enter') {
+                    submitVocabWord(hiddenInput);
+                }
+            };
+        }
+
+        function handleVocabInput(hiddenInput) {
+            const targetWord = state.vocabList[state.currentVocabIdx];
+            if (!targetWord) return;
+
+            const typedVal = hiddenInput.value;
+
+            // Space key check for submission
+            if (typedVal.endsWith(' ')) {
+                submitVocabWord(hiddenInput);
+                return;
+            }
+
+            playKeyStrokeSound();
+            let isMismatch = false;
+
+            for (let i = 0; i < targetWord.length; i++) {
+                const charSpan = document.getElementById(`vchar-${i}`);
+                if (!charSpan) continue;
+
+                if (i < typedVal.length) {
+                    if (typedVal[i].toLowerCase() === targetWord[i].toLowerCase()) {
+                        charSpan.className = 'text-cyan-300 font-black';
+                    } else {
+                        charSpan.className = 'text-red-400 bg-red-950/80 rounded px-0.5';
+                        isMismatch = true;
+                    }
+                } else {
+                    charSpan.className = 'text-slate-400';
+                }
+            }
+
+            if (isMismatch && typedVal.length > state.currentCharIdx) {
+                state.errorCount++;
+                state.streak = 0;
+                document.getElementById('liveStreak').innerText = '0x';
+                triggerDragPenalty();
+            }
+
+            state.currentCharIdx = typedVal.length;
+        }
+
+        function submitVocabWord(hiddenInput) {
+            const targetWord = state.vocabList[state.currentVocabIdx];
+            const typed = hiddenInput.value.trim().toLowerCase();
+
+            if (typed === targetWord.toLowerCase()) {
+                // Correct word cleared!
+                state.wordsCompleted++;
+                state.totalTypedChars += targetWord.length + 1;
+                state.streak++;
+                if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+
+                document.getElementById('liveStreak').innerText = `${state.streak}x`;
+
+                playSplashSound(1 + (state.streak * 0.05));
+                if (state.streak > 1) playComboSound(state.streak);
+
+                spawnFloatingPopText(targetWord);
+                createSplashEffect();
+
+                state.currentVocabIdx++;
+                updateVocabUserSwimmer();
+
+                if (state.currentVocabIdx >= state.vocabList.length) {
+                    if (state.timeLimitSec === 0) {
+                        finishRace();
+                        return;
+                    } else {
+                        // Loop vocab words for timed mode
+                        let pool = getVocabWords().sort(() => Math.random() - 0.5);
+                        state.vocabList = state.vocabList.concat(pool);
+                    }
+                }
+                renderVocabCard();
+            } else {
+                // Submitted incorrectly
+                state.errorCount++;
+                state.streak = 0;
+                document.getElementById('liveStreak').innerText = '0x';
+                triggerDragPenalty();
+            }
+        }
+
+        function handleSentenceInput(hiddenInput) {
+            const typedVal = hiddenInput.value;
+            const currentWord = state.words[state.currentWordIdx];
+            if (!currentWord) return;
+
+            if (typedVal.endsWith(' ')) {
+                const trimmed = typedVal.trim();
+                if (trimmed === currentWord) {
+                    createSplashEffect();
+                    playSplashSound();
+                    state.totalTypedChars += currentWord.length + 1;
+                    state.currentWordIdx++;
+                    state.currentCharIdx = 0;
+                    hiddenInput.value = '';
+
+                    checkLapProgress();
+
+                    if (state.currentWordIdx >= state.words.length) {
+                        finishRace();
+                        return;
+                    }
+                    highlightCurrentWord();
+                } else {
+                    triggerDragPenalty();
+                }
+                return;
+            }
+
+            playKeyStrokeSound();
+            let isMismatch = false;
+
+            for (let i = 0; i < currentWord.length; i++) {
+                const charSpan = document.getElementById(`char-${state.currentWordIdx}-${i}`);
+                if (!charSpan) continue;
+
+                if (i < typedVal.length) {
+                    if (typedVal[i] === currentWord[i]) {
+                        charSpan.className = 'text-cyan-300 font-bold';
+                    } else {
+                        charSpan.className = 'text-red-400 bg-red-950/60 rounded px-0.5';
+                        isMismatch = true;
+                    }
+                } else {
+                    charSpan.className = 'text-slate-400';
+                }
+            }
+
+            if (isMismatch && typedVal.length > state.currentCharIdx) {
+                state.errorCount++;
+                triggerDragPenalty();
+            }
+
+            state.currentCharIdx = typedVal.length;
+            updateUserSwimmerPosition();
+        }
+
+        function spawnFloatingPopText(word) {
+            const container = document.getElementById('popFxContainer');
+            const pop = document.createElement('div');
+            pop.className = 'word-pop-effect font-mono font-black text-amber-300 text-2xl absolute pointer-events-none drop-shadow-[0_0_8px_rgba(255,215,0,0.8)]';
+            pop.innerText = `+${word.toUpperCase()}! ${state.streak > 1 ? state.streak + 'x STREAK' : ''}`;
+            container.appendChild(pop);
+            setTimeout(() => pop.remove(), 700);
+        }
+
+        function triggerDragPenalty() {
+            const drag = document.getElementById('dragIndicator');
+            drag.classList.remove('hidden');
+            setTimeout(() => drag.classList.add('hidden'), 500);
+        }
+
+        function checkLapProgress() {
+            const wordsPerLap = Math.ceil(state.words.length / state.lapsTotal);
+            const lapNow = Math.min(state.lapsTotal, Math.floor(state.currentWordIdx / wordsPerLap) + 1);
+
+            if (lapNow > state.currentLap) {
+                const lapTimeSec = ((Date.now() - state.lapStartTime) / 1000).toFixed(2);
+                state.splitTimes.push({ lap: state.currentLap, time: lapTimeSec });
+                state.currentLap = lapNow;
+                state.lapStartTime = Date.now();
+                playBeepSound(880);
+            }
+            document.getElementById('lapStatusTag').innerText = `Lap ${state.currentLap} of ${state.lapsTotal}`;
+            document.getElementById('liveLap').innerText = `${state.currentLap}/${state.lapsTotal}`;
+        }
+
+        function updateVocabUserSwimmer() {
+            let total = state.vocabList.length;
+            state.userProgress = Math.min(100, (state.wordsCompleted / total) * 100);
+
+            const swimmer = document.getElementById('swimmerUser');
+            swimmer.style.left = `${state.userProgress * 0.9}%`;
+            document.getElementById('textProgressBar').style.width = `${state.userProgress}%`;
+        }
+
+        function updateUserSwimmerPosition() {
+            const totalChars = state.fullText.length;
+            const typedChars = state.totalTypedChars + state.currentCharIdx;
+            state.userProgress = Math.min(100, (typedChars / totalChars) * 100);
+
+            const swimmer = document.getElementById('swimmerUser');
+            swimmer.style.left = `${state.userProgress * 0.9}%`;
+            document.getElementById('textProgressBar').style.width = `${state.userProgress}%`;
+        }
+
+        function updateGhostPace() {
+            if (!state.startTime) return;
+            const elapsedMins = (Date.now() - state.startTime) / 60000;
+            const ghostChars = state.targetWpm * 5 * elapsedMins;
+
+            let totalChars = state.mode === 'vocab' ? state.vocabList.join(' ').length : state.fullText.length;
+            state.ghostProgress = Math.min(100, (ghostChars / totalChars) * 100);
+
+            const ghostSwimmer = document.getElementById('swimmerGhost');
+            ghostSwimmer.style.left = `${state.ghostProgress * 0.9}%`;
+            document.getElementById('ghost1Stats').innerText = `${state.targetWpm} WPM Pace`;
+        }
+
+        function updateLiveStats() {
+            if (!state.startTime) return;
+            const elapsedSec = (Date.now() - state.startTime) / 1000;
+            const elapsedMins = elapsedSec / 60;
+
+            // Check timer limit for timed sprint mode
+            if (state.mode === 'vocab' && state.timeLimitSec > 0) {
+                const remaining = Math.max(0, state.timeLimitSec - elapsedSec);
+                document.getElementById('liveTimer').innerText = formatTime(remaining);
+                if (remaining <= 0) {
+                    finishRace();
+                    return;
+                }
+            } else {
+                document.getElementById('liveTimer').innerText = formatTime(elapsedSec);
+            }
+
+            const typedChars = state.totalTypedChars + state.currentCharIdx;
+            const grossWpm = elapsedMins > 0 ? Math.round((typedChars / 5) / elapsedMins) : 0;
+            const accuracy = typedChars > 0 ? Math.max(0, Math.round(((typedChars - state.errorCount) / typedChars) * 100)) : 100;
+
+            document.getElementById('liveWpm').innerText = grossWpm;
+            document.getElementById('liveAcc').innerText = `${accuracy}%`;
+
+            const meters = Math.round((state.userProgress / 100) * state.distance);
+            document.getElementById('userSwimmerStats').innerText = `${grossWpm} WPM | ${meters}m`;
+
+            if (Math.floor(elapsedSec) % 2 === 0) {
+                state.wpmHistory.push({ time: Math.round(elapsedSec), wpm: grossWpm });
+            }
+        }
+
+        function createSplashEffect() {
+            const lane = document.getElementById('userPoolLane');
+            if (!lane) return;
+
+            for (let i = 0; i < 4; i++) {
+                const p = document.createElement('div');
+                p.className = 'splash-particle';
+                const x = (state.userProgress * 0.9) + 5;
+                p.style.left = `${x}%`;
+                p.style.top = `50%`;
+                p.style.width = `${Math.random() * 8 + 4}px`;
+                p.style.height = p.style.width;
+                p.style.setProperty('--dx', `${(Math.random() - 0.5) * 60}px`);
+                p.style.setProperty('--dy', `${(Math.random() - 0.5) * 60}px`);
+
+                lane.appendChild(p);
+                setTimeout(() => p.remove(), 600);
+            }
+        }
+
+        /* ==========================================================================
+           5. FINISH & ANALYTICS BREAKDOWN
+           ========================================================================== */
+        function finishRace() {
+            clearInterval(state.timerInterval);
+            clearInterval(state.ghostInterval);
+            playHornSound();
+
+            const elapsedSec = (Date.now() - state.startTime) / 1000;
+            const elapsedMins = elapsedSec / 60;
+            const typedChars = state.totalTypedChars;
+            const netWpm = Math.round((typedChars / 5) / elapsedMins);
+            const accuracy = Math.max(0, Math.round(((typedChars - state.errorCount) / typedChars) * 100));
+
+            document.getElementById('raceArena').classList.add('hidden');
+            document.getElementById('liveStatsHeader').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.remove('hidden');
+
+            document.getElementById('resWpm').innerText = netWpm;
+            document.getElementById('resAcc').innerText = `${accuracy}%`;
+            document.getElementById('resTime').innerText = formatTime(elapsedSec);
+
+            if (state.mode === 'vocab') {
+                document.getElementById('resErrors').innerText = state.maxStreak;
+                document.getElementById('resErrorsLabel').innerText = "Max Streak Combo";
+                document.getElementById('splitsListTitle').innerHTML = `<i class="fa-solid fa-list-check text-amber-400"></i> Vocab Terms Cleared`;
+            } else {
+                document.getElementById('resErrors').innerText = state.errorCount;
+                document.getElementById('resErrorsLabel').innerText = "Misstrokes / Drag";
+                document.getElementById('splitsListTitle').innerHTML = `<i class="fa-solid fa-stopwatch text-amber-400"></i> Lap Split Times`;
+            }
+
+            // Standard Qualification Badge
+            const badge = document.getElementById('resultBadge');
+            if (netWpm >= 95) {
+                badge.innerText = "★ All-American High School Standard";
+                badge.className = "inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2";
+            } else if (netWpm >= 75) {
+                badge.innerText = "★ State Championship Qualifier Cut";
+                badge.className = "inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/40 mb-2";
+            } else if (netWpm >= 50) {
+                badge.innerText = "★ High School Varsity Letter Standard";
+                badge.className = "inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 mb-2";
+            } else {
+                badge.innerText = "Novice Club Swimmer";
+                badge.className = "inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700 mb-2";
+            }
+
+            renderSplitsList();
+            renderWpmChart();
+            saveScore(netWpm, accuracy, badge.innerText);
+        }
+
+        function renderSplitsList() {
+            const list = document.getElementById('splitTimesList');
+            list.innerHTML = '';
+
+            if (state.mode === 'vocab') {
+                const wordsSlice = state.vocabList.slice(0, state.wordsCompleted);
+                wordsSlice.forEach((w, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'flex justify-between items-center bg-slate-900 px-3 py-1.5 rounded border border-slate-800 text-xs';
+                    row.innerHTML = `<span class="text-slate-400">#${i+1} <strong class="text-cyan-300 font-mono">${w}</strong></span><span class="text-teal-400 font-bold"><i class="fa-solid fa-check text-[10px]"></i></span>`;
+                    list.appendChild(row);
+                });
+            } else {
+                state.splitTimes.forEach(s => {
+                    const row = document.createElement('div');
+                    row.className = 'flex justify-between items-center bg-slate-900 px-3 py-2 rounded border border-slate-800';
+                    row.innerHTML = `<span class="text-slate-400">Lap ${s.lap} (50m):</span><span class="text-cyan-400 font-bold">${s.time}s</span>`;
+                    list.appendChild(row);
+                });
+            }
+        }
+
+        let chartInstance = null;
+        function renderWpmChart() {
+            const ctx = document.getElementById('wpmChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            const labels = state.wpmHistory.map(h => `${h.time}s`);
+            const data = state.wpmHistory.map(h => h.wpm);
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'WPM Speed',
+                        data: data,
+                        borderColor: '#00f3ff',
+                        backgroundColor: 'rgba(0, 243, 255, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        /* LOCAL STORAGE SCOREBOARD */
+        function saveScore(wpm, acc, cut) {
+            const scores = JSON.parse(localStorage.getItem('aquaTypeScores') || '[]');
+            const modeName = state.mode === 'vocab' ? `Vocab Burst (${state.category})` : `${state.distance}m ${state.category}`;
+            scores.push({
+                date: new Date().toLocaleDateString(),
+                event: modeName,
+                wpm: wpm,
+                acc: `${acc}%`,
+                cut: cut
+            });
+            scores.sort((a, b) => b.wpm - a.wpm);
+            localStorage.setItem('aquaTypeScores', JSON.stringify(scores.slice(0, 10)));
+        }
+
+        function showLeaderboard() {
+            const scores = JSON.parse(localStorage.getItem('aquaTypeScores') || '[]');
+            const tbody = document.getElementById('leaderboardRows');
+            tbody.innerHTML = '';
+
+            if (scores.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No swim meets recorded yet!</td></tr>`;
+            } else {
+                scores.forEach((s, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = idx % 2 === 0 ? 'bg-slate-950/40' : '';
+                    tr.innerHTML = `
+                        <td class="p-2 font-bold text-amber-400">${idx + 1}</td>
+                        <td class="p-2 text-slate-300 capitalize">${s.event}</td>
+                        <td class="p-2 text-cyan-400 font-bold">${s.wpm}</td>
+                        <td class="p-2 text-teal-300">${s.acc}</td>
+                        <td class="p-2 text-slate-400 text-[10px]">${s.cut}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById('leaderboardModal').classList.remove('hidden');
+        }
+
+        function hideLeaderboard() {
+            document.getElementById('leaderboardModal').classList.add('hidden');
+        }
+
+        function resetToMenu() {
+            clearInterval(state.timerInterval);
+            clearInterval(state.ghostInterval);
+
+            document.getElementById('raceArena').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.add('hidden');
+            document.getElementById('liveStatsHeader').classList.add('hidden');
+            document.getElementById('setupPanel').classList.remove('hidden');
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>

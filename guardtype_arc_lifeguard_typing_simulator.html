@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuardType: ARC Lifeguard Typing Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        guardRed: {
+                            400: '#ff4d4d',
+                            500: '#ff3333',
+                            600: '#cc0000',
+                            700: '#990000',
+                            950: '#2b0000',
+                        },
+                        guardBlue: {
+                            400: '#38bdf8',
+                            500: '#00a8e8',
+                            600: '#0077be',
+                            800: '#004080',
+                            950: '#001a33',
+                        },
+                        guardYellow: '#ffd166',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;800&display=swap');
+
+        /* Water Animation Background */
+        .water-bg {
+            background: linear-gradient(180deg, #004080 0%, #0077be 50%, #001a33 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .water-ripples {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background: repeating-radial-gradient(
+                circle at 50% 50%,
+                rgba(255, 255, 255, 0.04) 0px,
+                rgba(255, 255, 255, 0.04) 20px,
+                transparent 20px,
+                transparent 40px
+            );
+            animation: rippleMove 15s linear infinite;
+        }
+
+        @keyframes rippleMove {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* Float effects */
+        .float-anim {
+            animation: float 2.5s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-6px) rotate(2deg); }
+        }
+
+        /* Float Word Animation on Clear */
+        .word-pop-effect {
+            animation: popUpFade 0.7s ease-out forwards;
+        }
+        @keyframes popUpFade {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            50% { opacity: 0.9; transform: translateY(-30px) scale(1.25); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.4); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0077be;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00a8e8;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans h-full flex flex-col select-none overflow-x-hidden">
+
+    <!-- HEADER NAVIGATION BAR -->
+    <header class="bg-slate-900/90 border-b border-guardRed-600/40 backdrop-blur-md px-4 py-3 sticky top-0 z-50 flex flex-wrap justify-between items-center gap-3 shadow-xl">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-guardRed-600 to-red-500 p-2.5 rounded-xl shadow-lg shadow-guardRed-600/30 text-white font-black text-2xl border border-white/20">
+                <i class="fa-solid fa-life-ring animate-spin-slow"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-red-400 via-amber-300 to-guardBlue-400 bg-clip-text text-transparent flex items-center gap-2">
+                    GUARDTYPE <span class="text-[10px] px-2 py-0.5 rounded bg-guardRed-950 text-guardRed-400 border border-guardRed-700 font-mono tracking-widest font-bold">ARC LIFEGUARD</span>
+                </h1>
+                <p class="text-xs text-slate-400">American Red Cross Lifeguard Typing Simulator</p>
+            </div>
+        </div>
+
+        <!-- LIVE RACE STATS HEADER -->
+        <div id="liveStatsHeader" class="hidden flex items-center space-x-3 sm:space-x-5 bg-slate-950/80 px-4 py-1.5 rounded-xl border border-slate-800 font-mono text-xs sm:text-sm">
+            <div class="text-center">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Speed</span>
+                <span id="liveWpm" class="text-guardBlue-400 font-extrabold text-base sm:text-lg">0</span> <span class="text-[10px] text-slate-400">WPM</span>
+            </div>
+            <div class="h-6 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Accuracy</span>
+                <span id="liveAcc" class="text-teal-300 font-extrabold text-base sm:text-lg">100%</span>
+            </div>
+            <div class="h-6 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Time</span>
+                <span id="liveTimer" class="text-guardYellow font-extrabold text-base sm:text-lg">00:00</span>
+            </div>
+            <div id="liveStreakBox" class="text-center pl-2 border-l border-slate-800">
+                <span class="text-[10px] text-guardRed-400 block uppercase tracking-wider"><i class="fa-solid fa-bolt"></i> Streak</span>
+                <span id="liveStreak" class="text-amber-400 font-extrabold text-base sm:text-lg">0x</span>
+            </div>
+        </div>
+
+        <!-- CONTROL BUTTONS -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <!-- Whistle Sound Trigger Button -->
+            <button onclick="playWhistle(3)" class="p-2 sm:px-3 sm:py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold transition border border-amber-500/40 flex items-center gap-1.5" title="Sound EAP Whistle">
+                <i class="fa-solid fa-bullhorn text-amber-400"></i> <span class="hidden sm:inline">Whistle</span>
+            </button>
+            <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-guardBlue-400 transition border border-slate-700" title="Toggle Sound">
+                <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+            </button>
+            <button onclick="showLeaderboard()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-guardYellow text-xs font-bold transition border border-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-trophy"></i> <span class="hidden sm:inline">Scoreboard</span>
+            </button>
+            <button onclick="resetToMenu()" class="px-3.5 py-2 rounded-lg bg-guardRed-600 hover:bg-guardRed-500 text-white font-bold text-xs transition shadow-md shadow-guardRed-600/30 border border-guardRed-400/40">
+                <i class="fa-solid fa-sliders mr-1"></i> Setup Drill
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-1 flex flex-col max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
+
+        <!-- SETUP PANEL / MENU -->
+        <section id="setupPanel" class="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 sm:p-7 shadow-2xl backdrop-blur-md space-y-6">
+            <div class="border-b border-slate-800 pb-4 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-black text-white flex items-center gap-3">
+                        <i class="fa-solid fa-shield-halved text-guardRed-500"></i> ARC Lifeguard Certification Drills
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-1">Select your emergency protocol category, challenge mode, and certification speed goal to start scanning.</p>
+                </div>
+                <div class="bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800 flex items-center gap-2 text-xs text-slate-300">
+                    <i class="fa-solid fa-award text-guardYellow text-base"></i>
+                    <span>Target Goal: <strong id="targetGoalText" class="text-guardBlue-400">45 WPM (Certified Guard)</strong></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- 1. MODE SELECTION -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-guardRed-400">1. Select Drill Mode</label>
+                    <div class="grid grid-cols-1 gap-2.5">
+                        <button onclick="selectMode('sprint')" id="mode-sprint" class="mode-btn active p-3 rounded-xl border border-guardRed-500/80 bg-guardRed-950/30 text-left transition flex items-start gap-3 hover:border-guardRed-400">
+                            <i class="fa-solid fa-bolt text-amber-400 text-lg mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100 flex items-center gap-2">
+                                    Single Word Emergency Sprint
+                                    <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] px-1.5 py-0.2 rounded font-mono uppercase">Fast</span>
+                                </div>
+                                <div class="text-xs text-slate-400">Rapid-fire ARC rescue vocabulary & emergency equipment.</div>
+                            </div>
+                        </button>
+
+                        <button onclick="selectMode('protocols')" id="mode-protocols" class="mode-btn p-3 rounded-xl border border-slate-800 bg-slate-950/40 text-left transition flex items-start gap-3 hover:border-guardRed-400">
+                            <i class="fa-solid fa-book-medical text-guardBlue-400 text-lg mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100">EAP & Rescue Protocols</div>
+                                <div class="text-xs text-slate-400">Surveillance, water rescues, CPR/AED & spinal management drills.</div>
+                            </div>
+                        </button>
+
+                        <button onclick="selectMode('cpr')" id="mode-cpr" class="mode-btn p-3 rounded-xl border border-slate-800 bg-slate-950/40 text-left transition flex items-start gap-3 hover:border-guardRed-400">
+                            <i class="fa-solid fa-heart-pulse text-red-500 text-lg mt-1"></i>
+                            <div>
+                                <div class="font-bold text-slate-100 flex items-center gap-2">
+                                    CPR Rhythm & Compression Challenge
+                                    <span class="bg-red-500/20 text-red-300 border border-red-500/40 text-[9px] px-1.5 py-0.2 rounded font-mono uppercase">100-120 BPM</span>
+                                </div>
+                                <div class="text-xs text-slate-400">Maintain steady target WPM rhythm matching 100-120 BPM CPR tempo!</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. CATEGORY SELECTION & OPTIONS -->
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-guardRed-400">2. Curriculum Category</label>
+                    <select id="categorySelect" onchange="handleCategoryChange()" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 focus:outline-none focus:border-guardRed-400 text-xs sm:text-sm">
+                        <option value="all_vocab">All Emergency Vocab & Equipment (Combined)</option>
+                        <option value="surveillance">Category 1: Surveillance & Scanning (10/20 Standard, RID Factor)</option>
+                        <option value="rescues">Category 2: Water Rescue Techniques (Active, Passive, Submerged)</option>
+                        <option value="cpr_aed">Category 3: CPR / AED & First Aid Protocols (30:2, Naloxone, Shock)</option>
+                        <option value="spinal">Category 4: Spinal Injury Management (Head Splint, Strapping)</option>
+                        <option value="custom">Category 5: Custom Practice Text (Paste Notes)</option>
+                    </select>
+
+                    <!-- SPRINT LENGTH SELECTOR -->
+                    <div id="sprintGoalContainer" class="mt-3 space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-guardRed-400">Sprint Target Length</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="selectSprintGoal('20_words')" id="sgoal-20_words" class="sgoal-btn py-2 text-xs font-bold rounded-lg border border-guardRed-500 bg-guardRed-950/60 text-guardRed-300">20 Words</button>
+                            <button onclick="selectSprintGoal('40_words')" id="sgoal-40_words" class="sgoal-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">40 Words</button>
+                            <button onclick="selectSprintGoal('30_sec')" id="sgoal-30_sec" class="sgoal-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">30s Sprint</button>
+                            <button onclick="selectSprintGoal('60_sec')" id="sgoal-60_sec" class="sgoal-btn py-2 text-xs font-bold rounded-lg border border-slate-800 bg-slate-950/60 text-slate-400">60s Sprint</button>
+                        </div>
+                    </div>
+
+                    <!-- CUSTOM TEXT BOX -->
+                    <div id="customTextContainer" class="hidden mt-2">
+                        <textarea id="customTextInput" rows="3" placeholder="Paste custom lifeguard course notes or rescue scenario steps here..." class="w-full bg-slate-950 border border-guardRed-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-guardRed-400 font-mono"></textarea>
+                    </div>
+                </div>
+
+                <!-- 3. CERTIFICATION LEVEL & START -->
+                <div class="space-y-3 flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-guardRed-400">3. Target Speed Standard</label>
+                        <select id="speedGoalSelect" onchange="updateGoalText()" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 focus:outline-none focus:border-guardRed-400 text-xs sm:text-sm">
+                            <option value="35">Junior Water Safety Assistant (30-45 WPM)</option>
+                            <option value="50" selected>Certified Pool Lifeguard (46-60 WPM)</option>
+                            <option value="65">Waterfront & Attraction Guard (61-75 WPM)</option>
+                            <option value="80">LG Instructor / Head Guard (76-90 WPM)</option>
+                            <option value="95">Emergency Medical Responder Elite (91+ WPM)</option>
+                        </select>
+
+                        <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1 font-mono">
+                            <div class="flex justify-between"><span>CPR Pace:</span> <span class="text-red-400 font-bold">100-120 Compressions/min</span></div>
+                            <div class="flex justify-between"><span>Scanning Standard:</span> <span class="text-guardBlue-400 font-bold">10s Scan / 20s Reach</span></div>
+                            <div class="flex justify-between"><span>Passing Accuracy:</span> <span class="text-teal-300 font-bold">95%+ Required</span></div>
+                        </div>
+                    </div>
+
+                    <button onclick="startDrill()" class="w-full py-4 bg-gradient-to-r from-guardRed-600 via-red-500 to-amber-500 hover:from-guardRed-500 hover:to-amber-400 text-white font-black text-lg rounded-xl shadow-lg shadow-guardRed-600/30 uppercase tracking-wider transform transition active:scale-[0.98] flex items-center justify-center gap-2 border border-white/20">
+                        <i class="fa-solid fa-person-swimming"></i> Take Guard Stand & Start!
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- COUNTDOWN OVERLAY -->
+        <div id="countdownOverlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center">
+            <div class="text-guardRed-500 font-black text-3xl mb-2 flex items-center gap-2 animate-pulse">
+                <i class="fa-solid fa-whistle"></i> WHISTLE SOUNDING!
+            </div>
+            <p class="text-slate-300 uppercase tracking-widest text-xs font-bold mb-4">Lifeguards, Eyes On Your Zone...</p>
+            <div id="countdownNumber" class="text-8xl font-black text-amber-400 font-mono animate-bounce">3</div>
+            <p class="text-xs text-slate-500 mt-6">Type immediately upon the blast!</p>
+        </div>
+
+        <!-- RACE & DRILL ARENA -->
+        <section id="raceArena" class="hidden flex-1 flex flex-col space-y-4">
+            
+            <!-- VISUAL LIFEGUARD BAY / POOL SCENE -->
+            <div class="water-bg rounded-2xl border-2 border-guardBlue-600/50 p-4 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+                <div class="water-ripples"></div>
+
+                <!-- TOP DECK: LIFEGUARD STAND & VICTIM STATUS -->
+                <div class="relative z-10 flex justify-between items-center bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-700/60 backdrop-blur-sm">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-guardRed-600 text-white p-2 rounded-lg shadow font-black text-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-tower-observation"></i> ZONE 1
+                        </div>
+                        <div>
+                            <span id="victimTypeTag" class="text-xs font-bold text-amber-300 block">VICTIM STATUS: Active Drowning Victim</span>
+                            <span id="rescuePhaseTag" class="text-[10px] text-slate-400 font-mono">Phase: Water Rescue & Rescue Tube Tow</span>
+                        </div>
+                    </div>
+
+                    <!-- CPR RHYTHM METER (VISIBLE ONLY IN CPR MODE) -->
+                    <div id="cprRhythmContainer" class="hidden flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-lg border border-red-900/60 font-mono">
+                        <span class="text-[10px] text-slate-400 uppercase">CPR Rhythm:</span>
+                        <span id="cprBpmDisplay" class="text-xs font-black text-red-400">110 BPM</span>
+                        <div id="cprMeterIndicator" class="w-3 h-3 rounded-full bg-teal-400 animate-ping"></div>
+                    </div>
+                </div>
+
+                <!-- POOL RESCUE TRACK / PROGRESS ANIMATION -->
+                <div class="relative z-10 my-3">
+                    <div class="flex justify-between text-[10px] font-mono text-cyan-200 mb-1 px-1">
+                        <span><i class="fa-solid fa-person-swimming text-guardRed-400"></i> LIFEGUARD RESCUE PROGRESS</span>
+                        <span id="rescueDistanceText" class="font-bold text-cyan-300">0m / 25m Tow Complete</span>
+                    </div>
+
+                    <!-- Rescue Tube Track Lane -->
+                    <div class="relative h-12 w-full bg-slate-950/60 rounded-xl overflow-hidden border border-guardBlue-400/30 flex items-center px-2">
+                        <!-- Rescue Buoy Finish Line -->
+                        <div class="absolute right-4 top-0 bottom-0 w-2 bg-guardRed-500 z-10 shadow-[0_0_12px_#ff3333] flex items-center justify-center">
+                            <i class="fa-solid fa-life-ring text-[10px] text-white"></i>
+                        </div>
+
+                        <!-- Lifeguard Rescue Sprite -->
+                        <div id="lifeguardSprite" class="absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-200 flex items-center space-x-2" style="left: 0%;">
+                            <div class="bg-guardRed-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-md font-mono whitespace-nowrap flex items-center gap-1 border border-white/30">
+                                <i class="fa-solid fa-person-swimming"></i> RESCUER
+                            </div>
+                            <!-- Rescue Tube Graphic -->
+                            <div class="w-6 h-3 bg-guardRed-500 rounded-full border border-white float-anim flex items-center justify-center shadow">
+                                <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+                            </div>
+                        </div>
+
+                        <!-- Victim Silhouette Sprite -->
+                        <div id="victimSprite" class="absolute right-12 top-1/2 -translate-y-1/2 transition-all duration-300 flex items-center space-x-1">
+                            <div class="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap float-anim">
+                                <i class="fa-solid fa-person-falling-burst"></i> Victim
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RESCUE TUBE / COMPRESSION PROGRESS BAR -->
+                <div class="relative z-10 bg-slate-950/80 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                    <div id="rescueProgressBar" class="bg-gradient-to-r from-guardRed-500 via-amber-400 to-guardBlue-400 h-full w-0 transition-all duration-150"></div>
+                </div>
+            </div>
+
+            <!-- TYPING PRACTICE CARD -->
+            <div class="bg-slate-900 border-2 border-slate-800 focus-within:border-guardRed-500 rounded-2xl p-6 shadow-2xl relative flex flex-col justify-center">
+                
+                <!-- SINGLE WORD FLASHCARD DISPLAY (SPRINT MODE) -->
+                <div id="vocabCardDisplay" class="hidden flex flex-col items-center justify-center py-6 space-y-3 relative">
+                    <div id="popFxContainer" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+
+                    <div class="text-xs uppercase font-mono tracking-widest text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-kit-medical text-guardRed-400"></i> Emergency Equipment & Term Target
+                    </div>
+                    
+                    <div id="flashcardWord" class="font-mono text-3xl sm:text-5xl font-black text-cyan-300 tracking-wider bg-slate-950/90 border border-guardRed-800/80 px-8 py-4 rounded-2xl shadow-inner min-w-[280px] text-center select-none">
+                        <!-- Injected flashcard characters -->
+                    </div>
+
+                    <div class="text-xs font-mono text-slate-500">
+                        Next Word: <span id="nextVocabWord" class="text-slate-300 font-bold">---</span>
+                    </div>
+                </div>
+
+                <!-- STANDARD PROTOCOL SENTENCE DISPLAY -->
+                <div id="typingTextDisplay" class="font-mono text-base sm:text-xl leading-relaxed text-slate-400 max-h-52 overflow-y-auto p-4 bg-slate-950/80 rounded-xl border border-slate-800/80 tracking-wide select-none">
+                    <!-- Dynamic scenario text -->
+                </div>
+
+                <!-- HIDDEN INPUT RECEIVER -->
+                <input type="text" id="hiddenTypingInput" class="opacity-0 absolute inset-0 cursor-default" autocomplete="off" capitalize="off" spellcheck="false">
+
+                <!-- HELPER PROMPT -->
+                <div class="mt-4 flex justify-between items-center text-xs text-slate-500 font-mono">
+                    <span id="typingHelperText"><i class="fa-solid fa-keyboard text-guardRed-400 mr-1"></i> Type the emergency text above. Space to advance.</span>
+                    <span id="drillStatusTag" class="text-guardBlue-400 font-bold">Scanning Zone 1</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- POST-RESCUE ANALYTICS BREAKDOWN MODAL / PANEL -->
+        <section id="resultsPanel" class="hidden bg-slate-900/95 rounded-2xl border border-slate-800 p-6 shadow-2xl backdrop-blur-md space-y-6">
+            <div class="flex flex-wrap justify-between items-center border-b border-slate-800 pb-4 gap-4">
+                <div>
+                    <div id="resultBadge" class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2">
+                        Certified Pool Lifeguard Standard Achieved
+                    </div>
+                    <h2 class="text-3xl font-black text-white">Rescue Drill Analytics & Official Time</h2>
+                </div>
+                <button onclick="resetToMenu()" class="px-5 py-2.5 rounded-xl bg-guardRed-600 hover:bg-guardRed-500 text-white font-black text-sm transition shadow-lg shadow-guardRed-600/30">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Start Next Guard Shift
+                </button>
+            </div>
+
+            <!-- KEY METRICS CARDS -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Rescue Swim Speed</span>
+                    <span id="resWpm" class="text-3xl font-extrabold text-guardBlue-400 font-mono">0</span>
+                    <span class="text-xs text-slate-500 block">WPM</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Scanning Precision</span>
+                    <span id="resAcc" class="text-3xl font-extrabold text-teal-300 font-mono">0%</span>
+                    <span class="text-xs text-slate-500 block">Accuracy</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Official Response Time</span>
+                    <span id="resTime" class="text-3xl font-extrabold text-amber-400 font-mono">00:00</span>
+                    <span class="text-xs text-slate-500 block">Minutes:Seconds</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Max Combo / Drag</span>
+                    <span id="resErrors" class="text-3xl font-extrabold text-purple-400 font-mono">0</span>
+                    <span id="resErrorsLabel" class="text-xs text-slate-500 block">Max Streak</span>
+                </div>
+            </div>
+
+            <!-- PERFORMANCE GRAPH & WEAK KEYS -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-chart-line text-guardBlue-400"></i> Speed Curve (WPM over Rescue Shift)</h3>
+                    <div class="h-60">
+                        <canvas id="wpmChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-award text-amber-400"></i> ARC Certification Earned</h3>
+                        <div id="badgeContainer" class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-2">
+                            <div id="badgeIcon" class="text-4xl text-amber-400"><i class="fa-solid fa-award"></i></div>
+                            <div id="badgeTitle" class="font-extrabold text-white text-lg">Certified Pool Lifeguard</div>
+                            <p id="badgeDesc" class="text-xs text-slate-400">Qualified to manage primary surveillance and emergency water rescues.</p>
+                        </div>
+                    </div>
+
+                    <!-- SAVE HIGH SCORE FORM -->
+                    <div class="pt-2 border-t border-slate-800 space-y-2">
+                        <label class="block text-xs text-slate-400 font-bold uppercase">Enter Guard Name for Leaderboard:</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="guardNameInput" placeholder="Guard Name / Initials" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-guardRed-400 font-mono">
+                            <button onclick="saveGuardScore()" class="px-4 py-2 bg-guardRed-600 hover:bg-guardRed-500 text-white font-bold text-xs rounded-lg transition">Save Score</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCOREBOARD MODAL -->
+        <div id="leaderboardModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h3 class="text-xl font-extrabold text-amber-400 flex items-center gap-2">
+                        <i class="fa-solid fa-trophy"></i> ARC High School Guard Scoreboard
+                    </h3>
+                    <button onclick="hideLeaderboard()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+
+                <div class="overflow-y-auto max-h-80">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="text-slate-400 border-b border-slate-800 uppercase">
+                            <tr>
+                                <th class="p-2">#</th>
+                                <th class="p-2">Guard Name</th>
+                                <th class="p-2">WPM</th>
+                                <th class="p-2">Acc</th>
+                                <th class="p-2">Certification Standard</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardRows" class="divide-y divide-slate-800/50">
+                            <!-- Injected scores -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="hideLeaderboard()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-950 border-t border-slate-800/80 py-3 px-6 text-center text-xs text-slate-500 font-mono">
+        GuardType &bull; American Red Cross Lifeguard Training Typing Simulator &bull; HS Water Safety Program
+    </footer>
+
+    <!-- GAME LOGIC & AUDIO SYNTHESIZER SCRIPT -->
+    <script>
+        /* ==========================================================================
+           1. CURRICULUM VOCABULARY & PROTOCOL BANK (ARC LIFEGUARD SPECIFIC)
+           ========================================================================== */
+        const VOCAB_BANK = {
+            sprint: [
+                "RESCUE", "AGONA", "HAZMAT", "WHISTLE", "DEFIBRILLATOR", "HEMOPHILIA", "GLUCOSE",
+                "TOURNIQUET", "SURVEILLANCE", "HYPOTHERMIA", "HYPERVENTILATION", "BACKBOARD", "STRAP",
+                "COLLAR", "SUBMERSION", "AED", "SPINAL", "COMPRESSIONS", "VENTILATIONS", "CHOKING",
+                "PATROL", "SCANNING", "OXYGEN", "SUCTION", "TRAUMA", "HEMOSTASIS", "CYANOSIS"
+            ]
+        };
+
+        const PROTOCOLS = {
+            surveillance: [
+                "The ten-twenty protection standard requires a lifeguard to scan their entire designated zone within ten seconds and be able to reach the furthest victim in distress within twenty seconds.",
+                "RID factor stands for Recognition, Intrusion, and Distraction. Lifeguards fail to avert drownings when they fail to recognize distress, allow non-lifeguard duties to intrude, or become distracted.",
+                "Active searching scanning involves continuously moving your eyes across the bottom, middle, and surface of the water in a systematic sweeping pattern across your assigned zone."
+            ],
+            rescues: [
+                "Active Victim Front Rescue: Approach the active drowning victim from the front, thrust the rescue tube firmly into their chest, and push them backward to safety.",
+                "Passive Submerged Victim Rescue: Perform a feet-first surface dive, reach under the victim's armpits, pull them onto your rescue tube, and tow them to the deck.",
+                "Extrication with Backboard: Align the backboard in the water, secure the victim with straps from top to bottom, and use a team lift to extract them smoothly onto the pool deck."
+            ],
+            cpr_aed: [
+                "Adult CPR Protocol: Deliver thirty chest compressions at a depth of at least two inches, followed by two rescue ventilations until an AED or EMS arrives.",
+                "When operating an Automated External Defibrillator, wipe the victim's chest completely dry, attach pads firmly, shout 'Stand Clear', and press the shock button when advised.",
+                "For a choking unresponsive victim, lower them carefully to a firm flat surface, activate EAP, and immediately begin chest compressions before inspecting the mouth."
+            ],
+            spinal: [
+                "Head Splint Technique: Clamp the victim's upper arms firmly against their head to immobilize the cervical spine while gently rolling them face up in the water.",
+                "In-line stabilization must be maintained continuously during deep water spinal rescues until the victim is secured onto a rigid backboard with head blocks."
+            ]
+        };
+
+        /* ==========================================================================
+           2. AUDIO SYNTHESIZER (WEB AUDIO API)
+           ========================================================================== */
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            if (soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high';
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-500';
+            }
+        }
+
+        function playKeyStrokeSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(500 + Math.random() * 80, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.04);
+        }
+
+        function playWhistle(blastCount = 1) {
+            if (!soundEnabled) return;
+            initAudio();
+
+            for (let b = 0; b < blastCount; b++) {
+                const startTime = audioCtx.currentTime + (b * 0.22);
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc1.type = 'square';
+                osc2.type = 'sawtooth';
+
+                osc1.frequency.setValueAtTime(2800, startTime);
+                osc2.frequency.setValueAtTime(3100, startTime);
+
+                gain.gain.setValueAtTime(0.12, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc1.start(startTime);
+                osc2.start(startTime);
+                osc1.stop(startTime + 0.15);
+                osc2.stop(startTime + 0.15);
+            }
+        }
+
+        function playSplashSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const bufferSize = audioCtx.sampleRate * 0.12;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1000, audioCtx.currentTime);
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        function playCprBeep() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.08);
+        }
+
+        /* ==========================================================================
+           3. STATE MANAGEMENT
+           ========================================================================== */
+        let state = {
+            mode: 'sprint', // sprint, protocols, cpr
+            category: 'all_vocab',
+            sprintGoal: '20_words',
+            targetWpmGoal: 50,
+            vocabList: [],
+            currentVocabIdx: 0,
+            fullText: '',
+            words: [],
+            currentWordIdx: 0,
+            currentCharIdx: 0,
+            totalTypedChars: 0,
+            errorCount: 0,
+            streak: 0,
+            maxStreak: 0,
+            wordsCompleted: 0,
+            startTime: null,
+            timerInterval: null,
+            timeLimitSec: 0,
+            userProgress: 0,
+            wpmHistory: [],
+            cprBpm: 110,
+            cprBeepInterval: null
+        };
+
+        function selectMode(m) {
+            state.mode = m;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('border-guardRed-500/80', 'bg-guardRed-950/30');
+                btn.classList.add('border-slate-800', 'bg-slate-950/40');
+            });
+            const activeBtn = document.getElementById(`mode-${m}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-slate-800', 'bg-slate-950/40');
+                activeBtn.classList.add('border-guardRed-500/80', 'bg-guardRed-950/30');
+            }
+
+            const sprintGoalBox = document.getElementById('sprintGoalContainer');
+            if (m === 'sprint') {
+                sprintGoalBox.classList.remove('hidden');
+            } else {
+                sprintGoalBox.classList.add('hidden');
+            }
+        }
+
+        function selectSprintGoal(goal) {
+            state.sprintGoal = goal;
+            document.querySelectorAll('.sgoal-btn').forEach(btn => {
+                btn.classList.remove('border-guardRed-500', 'bg-guardRed-950/60', 'text-guardRed-300');
+                btn.classList.add('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+            });
+            const active = document.getElementById(`sgoal-${goal}`);
+            if (active) {
+                active.classList.remove('border-slate-800', 'text-slate-400');
+                active.classList.add('border-guardRed-500', 'bg-guardRed-950/60', 'text-guardRed-300');
+            }
+        }
+
+        function handleCategoryChange() {
+            const select = document.getElementById('categorySelect');
+            const customBox = document.getElementById('customTextContainer');
+            state.category = select.value;
+            if (select.value === 'custom') {
+                customBox.classList.remove('hidden');
+            } else {
+                customBox.classList.add('hidden');
+            }
+        }
+
+        function updateGoalText() {
+            const val = parseInt(document.getElementById('speedGoalSelect').value);
+            state.targetWpmGoal = val;
+            let text = `${val} WPM Goal`;
+            if (val <= 40) text = `${val} WPM (Junior Safety Assistant)`;
+            else if (val <= 55) text = `${val} WPM (Certified Pool Guard)`;
+            else if (val <= 70) text = `${val} WPM (Waterfront Guard)`;
+            else if (val <= 85) text = `${val} WPM (Head Guard / Instructor)`;
+            else text = `${val} WPM (Emergency Responder Elite)`;
+            document.getElementById('targetGoalText').innerText = text;
+        }
+
+        /* Build Text / Vocab Pool */
+        function getVocabWords() {
+            if (state.category === 'custom') {
+                const txt = document.getElementById('customTextInput').value.trim();
+                const words = txt.split(/\s+/).filter(w => w.length > 0);
+                return words.length > 0 ? words : VOCAB_BANK.sprint;
+            }
+            return [...VOCAB_BANK.sprint];
+        }
+
+        function buildProtocolText() {
+            if (state.category === 'custom') {
+                const txt = document.getElementById('customTextInput').value.trim();
+                return txt.length > 15 ? txt : PROTOCOLS.surveillance[0];
+            }
+            if (state.category in PROTOCOLS) {
+                return PROTOCOLS[state.category].join(' ');
+            }
+            // Combined
+            return [
+                ...PROTOCOLS.surveillance,
+                ...PROTOCOLS.rescues,
+                ...PROTOCOLS.cpr_aed,
+                ...PROTOCOLS.spinal
+            ].join(' ');
+        }
+
+        /* ==========================================================================
+           4. DRILL EXECUTION & ENGINE
+           ========================================================================== */
+        function startDrill() {
+            state.errorCount = 0;
+            state.streak = 0;
+            state.maxStreak = 0;
+            state.wordsCompleted = 0;
+            state.totalTypedChars = 0;
+            state.userProgress = 0;
+            state.wpmHistory = [];
+
+            if (state.mode === 'sprint') {
+                let pool = getVocabWords().sort(() => Math.random() - 0.5);
+                state.vocabList = pool;
+                state.currentVocabIdx = 0;
+
+                if (state.sprintGoal === '20_words') {
+                    state.vocabList = state.vocabList.slice(0, 20);
+                    state.timeLimitSec = 0;
+                } else if (state.sprintGoal === '40_words') {
+                    while (state.vocabList.length < 40) {
+                        state.vocabList = state.vocabList.concat(getVocabWords().sort(() => Math.random() - 0.5));
+                    }
+                    state.vocabList = state.vocabList.slice(0, 40);
+                    state.timeLimitSec = 0;
+                } else if (state.sprintGoal === '30_sec') {
+                    state.timeLimitSec = 30;
+                } else if (state.sprintGoal === '60_sec') {
+                    state.timeLimitSec = 60;
+                }
+            } else {
+                state.fullText = buildProtocolText();
+                state.words = state.fullText.split(' ');
+                state.currentWordIdx = 0;
+                state.currentCharIdx = 0;
+            }
+
+            // Hide Setup, Show Countdown
+            document.getElementById('setupPanel').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.add('hidden');
+            document.getElementById('countdownOverlay').classList.remove('hidden');
+
+            let countdown = 3;
+            document.getElementById('countdownNumber').innerText = countdown;
+            playWhistle(1);
+
+            const timer = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    document.getElementById('countdownNumber').innerText = countdown;
+                    playWhistle(1);
+                } else if (countdown === 0) {
+                    document.getElementById('countdownNumber').innerText = "EYES ON ZONE!";
+                    playWhistle(2);
+                } else {
+                    clearInterval(timer);
+                    document.getElementById('countdownOverlay').classList.add('hidden');
+                    document.getElementById('raceArena').classList.remove('hidden');
+                    document.getElementById('liveStatsHeader').classList.remove('hidden');
+
+                    initActualDrill();
+                }
+            }, 850);
+        }
+
+        function initActualDrill() {
+            state.startTime = Date.now();
+
+            if (state.mode === 'sprint') {
+                document.getElementById('vocabCardDisplay').classList.remove('hidden');
+                document.getElementById('typingTextDisplay').classList.add('hidden');
+                document.getElementById('cprRhythmContainer').classList.add('hidden');
+                document.getElementById('victimTypeTag').innerText = "VICTIM STATUS: Active Drowning Victim";
+                document.getElementById('rescuePhaseTag').innerText = "Phase: Single Word Emergency Sprint";
+                renderVocabCard();
+            } else if (state.mode === 'cpr') {
+                document.getElementById('vocabCardDisplay').classList.add('hidden');
+                document.getElementById('typingTextDisplay').classList.remove('hidden');
+                document.getElementById('cprRhythmContainer').classList.remove('hidden');
+                document.getElementById('victimTypeTag').innerText = "VICTIM STATUS: Unresponsive / No Breathing";
+                document.getElementById('rescuePhaseTag').innerText = "Phase: CPR Compressions (Target 100-120 BPM)";
+                renderTextDisplay();
+
+                // Start CPR Metronome Beep
+                state.cprBeepInterval = setInterval(playCprBeep, (60 / 110) * 1000);
+            } else {
+                document.getElementById('vocabCardDisplay').classList.add('hidden');
+                document.getElementById('typingTextDisplay').classList.remove('hidden');
+                document.getElementById('cprRhythmContainer').classList.add('hidden');
+                document.getElementById('victimTypeTag').innerText = "VICTIM STATUS: Protocol Scenario Execution";
+                document.getElementById('rescuePhaseTag').innerText = "Phase: ARC EAP Standard Operating Procedures";
+                renderTextDisplay();
+            }
+
+            setupInputListener();
+            state.timerInterval = setInterval(updateLiveStats, 200);
+        }
+
+        /* Render Vocab Card */
+        function renderVocabCard() {
+            const word = state.vocabList[state.currentVocabIdx];
+            if (!word) {
+                finishDrill();
+                return;
+            }
+
+            const card = document.getElementById('flashcardWord');
+            card.innerHTML = '';
+
+            word.split('').forEach((char, cIdx) => {
+                const span = document.createElement('span');
+                span.id = `vchar-${cIdx}`;
+                span.innerText = char;
+                span.className = 'text-slate-400 transition-colors';
+                card.appendChild(span);
+            });
+
+            const nextWord = state.vocabList[state.currentVocabIdx + 1];
+            document.getElementById('nextVocabWord').innerText = nextWord || 'Final Word!';
+
+            const hiddenInput = document.getElementById('hiddenTypingInput');
+            hiddenInput.value = '';
+            state.currentCharIdx = 0;
+        }
+
+        /* Render Sentence Display */
+        function renderTextDisplay() {
+            const container = document.getElementById('typingTextDisplay');
+            container.innerHTML = '';
+
+            state.words.forEach((word, wIdx) => {
+                const wordSpan = document.createElement('span');
+                wordSpan.id = `word-${wIdx}`;
+                wordSpan.className = 'inline-block mr-2 my-1 rounded px-1 transition-colors';
+
+                word.split('').forEach((char, cIdx) => {
+                    const charSpan = document.createElement('span');
+                    charSpan.id = `char-${wIdx}-${cIdx}`;
+                    charSpan.innerText = char;
+                    wordSpan.appendChild(charSpan);
+                });
+
+                container.appendChild(wordSpan);
+            });
+
+            highlightCurrentWord();
+        }
+
+        function highlightCurrentWord() {
+            document.querySelectorAll('#typingTextDisplay > span').forEach(s => {
+                s.classList.remove('bg-guardRed-950/60', 'border-b-2', 'border-guardRed-400');
+            });
+
+            const current = document.getElementById(`word-${state.currentWordIdx}`);
+            if (current) {
+                current.classList.add('bg-guardRed-950/60', 'border-b-2', 'border-guardRed-400');
+                current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        /* Input Listener & Processing */
+        function setupInputListener() {
+            const hiddenInput = document.getElementById('hiddenTypingInput');
+            hiddenInput.value = '';
+            hiddenInput.focus();
+
+            document.getElementById('raceArena').onclick = () => hiddenInput.focus();
+
+            hiddenInput.oninput = () => {
+                if (state.mode === 'sprint') {
+                    handleVocabInput(hiddenInput);
+                } else {
+                    handleSentenceInput(hiddenInput);
+                }
+            };
+
+            hiddenInput.onkeydown = (e) => {
+                if (state.mode === 'sprint' && e.key === 'Enter') {
+                    submitVocabWord(hiddenInput);
+                }
+            };
+        }
+
+        function handleVocabInput(hiddenInput) {
+            const targetWord = state.vocabList[state.currentVocabIdx];
+            if (!targetWord) return;
+
+            const typedVal = hiddenInput.value;
+
+            if (typedVal.endsWith(' ')) {
+                submitVocabWord(hiddenInput);
+                return;
+            }
+
+            playKeyStrokeSound();
+
+            for (let i = 0; i < targetWord.length; i++) {
+                const charSpan = document.getElementById(`vchar-${i}`);
+                if (!charSpan) continue;
+
+                if (i < typedVal.length) {
+                    if (typedVal[i].toLowerCase() === targetWord[i].toLowerCase()) {
+                        charSpan.className = 'text-cyan-300 font-black';
+                    } else {
+                        charSpan.className = 'text-red-400 bg-red-950/80 rounded px-0.5';
+                    }
+                } else {
+                    charSpan.className = 'text-slate-400';
+                }
+            }
+
+            state.currentCharIdx = typedVal.length;
+        }
+
+        function submitVocabWord(hiddenInput) {
+            const targetWord = state.vocabList[state.currentVocabIdx];
+            const typed = hiddenInput.value.trim().toLowerCase();
+
+            if (typed === targetWord.toLowerCase()) {
+                state.wordsCompleted++;
+                state.totalTypedChars += targetWord.length + 1;
+                state.streak++;
+                if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+
+                document.getElementById('liveStreak').innerText = `${state.streak}x`;
+                playSplashSound();
+
+                spawnFloatingPopText(targetWord);
+                state.currentVocabIdx++;
+                updateProgress();
+
+                if (state.currentVocabIdx >= state.vocabList.length) {
+                    if (state.timeLimitSec === 0) {
+                        finishDrill();
+                        return;
+                    } else {
+                        state.vocabList = state.vocabList.concat(getVocabWords().sort(() => Math.random() - 0.5));
+                    }
+                }
+                renderVocabCard();
+            } else {
+                state.errorCount++;
+                state.streak = 0;
+                document.getElementById('liveStreak').innerText = '0x';
+            }
+        }
+
+        function handleSentenceInput(hiddenInput) {
+            const typedVal = hiddenInput.value;
+            const currentWord = state.words[state.currentWordIdx];
+            if (!currentWord) return;
+
+            if (typedVal.endsWith(' ')) {
+                const trimmed = typedVal.trim();
+                if (trimmed === currentWord) {
+                    playSplashSound();
+                    state.totalTypedChars += currentWord.length + 1;
+                    state.currentWordIdx++;
+                    state.currentCharIdx = 0;
+                    hiddenInput.value = '';
+
+                    updateProgress();
+
+                    if (state.currentWordIdx >= state.words.length) {
+                        finishDrill();
+                        return;
+                    }
+                    highlightCurrentWord();
+                } else {
+                    state.errorCount++;
+                }
+                return;
+            }
+
+            playKeyStrokeSound();
+
+            for (let i = 0; i < currentWord.length; i++) {
+                const charSpan = document.getElementById(`char-${state.currentWordIdx}-${i}`);
+                if (!charSpan) continue;
+
+                if (i < typedVal.length) {
+                    if (typedVal[i] === currentWord[i]) {
+                        charSpan.className = 'text-cyan-300 font-bold';
+                    } else {
+                        charSpan.className = 'text-red-400 bg-red-950/60 rounded px-0.5';
+                    }
+                } else {
+                    charSpan.className = 'text-slate-400';
+                }
+            }
+
+            state.currentCharIdx = typedVal.length;
+            updateProgress();
+        }
+
+        function spawnFloatingPopText(word) {
+            const container = document.getElementById('popFxContainer');
+            const pop = document.createElement('div');
+            pop.className = 'word-pop-effect font-mono font-black text-amber-300 text-xl absolute pointer-events-none drop-shadow-[0_0_8px_rgba(255,209,102,0.8)]';
+            pop.innerText = `+${word.toUpperCase()}! ${state.streak > 1 ? state.streak + 'x STREAK' : ''}`;
+            container.appendChild(pop);
+            setTimeout(() => pop.remove(), 700);
+        }
+
+        function updateProgress() {
+            if (state.mode === 'sprint') {
+                const total = state.vocabList.length;
+                state.userProgress = Math.min(100, (state.wordsCompleted / total) * 100);
+            } else {
+                const totalChars = state.fullText.length;
+                const typedChars = state.totalTypedChars + state.currentCharIdx;
+                state.userProgress = Math.min(100, (typedChars / totalChars) * 100);
+            }
+
+            const sprite = document.getElementById('lifeguardSprite');
+            sprite.style.left = `${state.userProgress * 0.88}%`;
+            document.getElementById('rescueProgressBar').style.width = `${state.userProgress}%`;
+
+            const meters = Math.round((state.userProgress / 100) * 25);
+            document.getElementById('rescueDistanceText').innerText = `${meters}m / 25m Rescue Swim Complete`;
+        }
+
+        function updateLiveStats() {
+            if (!state.startTime) return;
+            const elapsedSec = (Date.now() - state.startTime) / 1000;
+            const elapsedMins = elapsedSec / 60;
+
+            if (state.mode === 'sprint' && state.timeLimitSec > 0) {
+                const remaining = Math.max(0, state.timeLimitSec - elapsedSec);
+                document.getElementById('liveTimer').innerText = formatTime(remaining);
+                if (remaining <= 0) {
+                    finishDrill();
+                    return;
+                }
+            } else {
+                document.getElementById('liveTimer').innerText = formatTime(elapsedSec);
+            }
+
+            const typedChars = state.totalTypedChars + state.currentCharIdx;
+            const grossWpm = elapsedMins > 0 ? Math.round((typedChars / 5) / elapsedMins) : 0;
+            const accuracy = typedChars > 0 ? Math.max(0, Math.round(((typedChars - state.errorCount) / typedChars) * 100)) : 100;
+
+            document.getElementById('liveWpm').innerText = grossWpm;
+            document.getElementById('liveAcc').innerText = `${accuracy}%`;
+
+            if (Math.floor(elapsedSec) % 2 === 0) {
+                state.wpmHistory.push({ time: Math.round(elapsedSec), wpm: grossWpm });
+            }
+        }
+
+        /* ==========================================================================
+           5. FINISH & ANALYTICS
+           ========================================================================== */
+        function finishDrill() {
+            clearInterval(state.timerInterval);
+            if (state.cprBeepInterval) clearInterval(state.cprBeepInterval);
+
+            playWhistle(3);
+
+            const elapsedSec = (Date.now() - state.startTime) / 1000;
+            const elapsedMins = elapsedSec / 60;
+            const typedChars = state.totalTypedChars;
+            const netWpm = Math.round((typedChars / 5) / elapsedMins);
+            const accuracy = Math.max(0, Math.round(((typedChars - state.errorCount) / typedChars) * 100));
+
+            document.getElementById('raceArena').classList.add('hidden');
+            document.getElementById('liveStatsHeader').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.remove('hidden');
+
+            document.getElementById('resWpm').innerText = netWpm;
+            document.getElementById('resAcc').innerText = `${accuracy}%`;
+            document.getElementById('resTime').innerText = formatTime(elapsedSec);
+            document.getElementById('resErrors').innerText = state.mode === 'sprint' ? state.maxStreak : state.errorCount;
+            document.getElementById('resErrorsLabel').innerText = state.mode === 'sprint' ? "Max Streak" : "Errors / Drag";
+
+            // Determine ARC Certification Badge
+            const badge = document.getElementById('resultBadge');
+            const badgeTitle = document.getElementById('badgeTitle');
+            const badgeDesc = document.getElementById('badgeDesc');
+            const badgeIcon = document.getElementById('badgeIcon');
+
+            if (netWpm >= 91) {
+                badge.innerText = "★ Emergency Medical Responder Elite";
+                badgeTitle.innerText = "EMR Elite Lifeguard";
+                badgeDesc.innerText = "Mastery of primary surveillance, high-speed resuscitation, and complex extrication.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-star-of-life text-red-500"></i>`;
+            } else if (netWpm >= 76) {
+                badge.innerText = "★ Head Guard / Instructor Standard";
+                badgeTitle.innerText = "LG Instructor / Head Guard";
+                badgeDesc.innerText = "Qualified to supervise zone rotations and instruct ARC water safety courses.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-graduation-cap text-amber-400"></i>`;
+            } else if (netWpm >= 61) {
+                badge.innerText = "★ Waterfront & Attraction Guard";
+                badgeTitle.innerText = "Waterfront & Attraction Guard";
+                badgeDesc.innerText = "Certified for open water, wave pools, and high-capacity aquatic facilities.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-water text-guardBlue-400"></i>`;
+            } else if (netWpm >= 46) {
+                badge.innerText = "★ Certified Pool Lifeguard";
+                badgeTitle.innerText = "Certified Pool Lifeguard";
+                badgeDesc.innerText = "Qualified for standard pool surveillance, EAP response, and CPR/AED operation.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-life-ring text-guardRed-500"></i>`;
+            } else {
+                badge.innerText = "Junior Water Safety Assistant";
+                badgeTitle.innerText = "Junior Water Safety Assistant";
+                badgeDesc.innerText = "Developing core scanning discipline and emergency protocol knowledge.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-shield text-slate-400"></i>`;
+            }
+
+            renderWpmChart();
+        }
+
+        let chartInstance = null;
+        function renderWpmChart() {
+            const ctx = document.getElementById('wpmChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            const labels = state.wpmHistory.map(h => `${h.time}s`);
+            const data = state.wpmHistory.map(h => h.wpm);
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Rescue Speed (WPM)',
+                        data: data,
+                        borderColor: '#ff3333',
+                        backgroundColor: 'rgba(255, 51, 51, 0.12)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        /* LOCAL STORAGE SCOREBOARD */
+        function saveGuardScore() {
+            const name = document.getElementById('guardNameInput').value.trim() || 'Anonymous Guard';
+            const wpm = parseInt(document.getElementById('resWpm').innerText);
+            const acc = document.getElementById('resAcc').innerText;
+            const cert = document.getElementById('badgeTitle').innerText;
+
+            const scores = JSON.parse(localStorage.getItem('guardTypeScores') || '[]');
+            scores.push({ name, wpm, acc, cert, date: new Date().toLocaleDateString() });
+            scores.sort((a, b) => b.wpm - a.wpm);
+
+            localStorage.setItem('guardTypeScores', JSON.stringify(scores.slice(0, 10)));
+            showLeaderboard();
+        }
+
+        function showLeaderboard() {
+            const scores = JSON.parse(localStorage.getItem('guardTypeScores') || '[]');
+            const tbody = document.getElementById('leaderboardRows');
+            tbody.innerHTML = '';
+
+            if (scores.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No ARC guard shifts recorded yet!</td></tr>`;
+            } else {
+                scores.forEach((s, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = idx % 2 === 0 ? 'bg-slate-950/40' : '';
+                    tr.innerHTML = `
+                        <td class="p-2 font-bold text-amber-400">${idx + 1}</td>
+                        <td class="p-2 text-slate-200 font-bold">${s.name}</td>
+                        <td class="p-2 text-guardBlue-400 font-extrabold">${s.wpm}</td>
+                        <td class="p-2 text-teal-300">${s.acc}</td>
+                        <td class="p-2 text-slate-400 text-[10px]">${s.cert}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById('leaderboardModal').classList.remove('hidden');
+        }
+
+        function hideLeaderboard() {
+            document.getElementById('leaderboardModal').classList.add('hidden');
+        }
+
+        function resetToMenu() {
+            clearInterval(state.timerInterval);
+            if (state.cprBeepInterval) clearInterval(state.cprBeepInterval);
+
+            document.getElementById('raceArena').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.add('hidden');
+            document.getElementById('liveStatsHeader').classList.add('hidden');
+            document.getElementById('setupPanel').classList.remove('hidden');
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>

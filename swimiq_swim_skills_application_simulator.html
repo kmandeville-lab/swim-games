@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwimIQ: High School Swim Skills & Race Application Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        swimNavy: '#030f26',
+                        swimBlue: {
+                            400: '#38bdf8',
+                            500: '#00a8e8',
+                            600: '#0077be',
+                            800: '#004080',
+                            950: '#001329',
+                        },
+                        swimGold: '#ffd166',
+                        swimCyan: '#22d3ee',
+                        swimTeal: '#2dd4bf',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Post-Game Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;800&display=swap');
+
+        /* Aquatic Pool Background with Shimmer Animation */
+        .pool-water-bg {
+            background: linear-gradient(180deg, #002244 0%, #004080 50%, #001329 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .water-shimmer {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background: repeating-radial-gradient(
+                circle at 50% 50%,
+                rgba(34, 211, 238, 0.05) 0px,
+                rgba(34, 211, 238, 0.05) 25px,
+                transparent 25px,
+                transparent 50px
+            );
+            animation: waterFlow 18s linear infinite;
+        }
+
+        @keyframes waterFlow {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.08); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* Swimming Pool Lane Markers */
+        .lane-rope {
+            background: repeating-linear-gradient(
+                90deg,
+                #ef4444 0px, #ef4444 12px,
+                #ffffff 12px, #ffffff 24px,
+                #22c55e 24px, #22c55e 36px,
+                #3b82f6 36px, #3b82f6 48px
+            );
+            height: 6px;
+        }
+
+        /* Swimmer Movement & Floating FX */
+        .float-swimmer {
+            animation: swimMotion 2s ease-in-out infinite;
+        }
+        @keyframes swimMotion {
+            0%, 100% { transform: translateY(-50%) translateX(0px); }
+            50% { transform: translateY(calc(-50% - 4px)) translateX(3px); }
+        }
+
+        .splash-particle {
+            animation: splashPop 0.5s ease-out forwards;
+        }
+        @keyframes splashPop {
+            0% { opacity: 1; transform: scale(0.4) translateY(0); }
+            50% { opacity: 0.9; transform: scale(1.2) translateY(-12px); }
+            100% { opacity: 0; transform: scale(1.6) translateY(-24px); }
+        }
+
+        .drag-fx {
+            animation: dragShake 0.4s ease-in-out;
+        }
+        @keyframes dragShake {
+            0%, 100% { transform: translateY(-50%) translateX(0); }
+            25% { transform: translateY(-50%) translateX(-8px); }
+            75% { transform: translateY(-50%) translateX(4px); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030f26;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0077be;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #22d3ee;
+        }
+    </style>
+</head>
+<body class="bg-swimNavy text-slate-100 font-sans h-full flex flex-col select-none overflow-x-hidden">
+
+    <!-- TOP HEADER / NAV BAR -->
+    <header class="bg-slate-900/90 border-b border-swimBlue-600/40 backdrop-blur-md px-4 py-3 sticky top-0 z-50 flex flex-wrap justify-between items-center gap-3 shadow-2xl">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-swimBlue-600 to-swimCyan p-2.5 rounded-xl shadow-lg shadow-swimBlue-600/30 text-slate-950 font-black text-2xl border border-white/20">
+                <i class="fa-solid fa-person-swimming"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-swimCyan via-swimGold to-swimBlue-400 bg-clip-text text-transparent flex items-center gap-2">
+                    SWIM<span class="text-white">IQ</span> <span class="text-[10px] px-2 py-0.5 rounded bg-swimBlue-950 text-swimCyan border border-swimBlue-700 font-mono tracking-wider font-bold">HS SKILLS SIMULATOR</span>
+                </h1>
+                <p class="text-xs text-slate-400">Practical Application of Race Strategy, Biomechanics & Pool Math</p>
+            </div>
+        </div>
+
+        <!-- LIVE PACE CLOCK & SWIM IQ HUD -->
+        <div id="liveStatsHeader" class="hidden flex items-center space-x-3 sm:space-x-5 bg-slate-950/90 px-4 py-1.5 rounded-xl border border-slate-800 font-mono text-xs sm:text-sm">
+            <div class="text-center">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Pace Clock</span>
+                <span id="paceClockDisplay" class="text-swimGold font-extrabold text-base sm:text-lg">00:00.0</span>
+            </div>
+            <div class="h-6 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Swim IQ Score</span>
+                <span id="liveSwimIQ" class="text-swimCyan font-extrabold text-base sm:text-lg">0</span>
+            </div>
+            <div class="h-6 w-px bg-slate-800"></div>
+            <div class="text-center">
+                <span class="text-[10px] text-slate-400 block uppercase tracking-wider">Accuracy</span>
+                <span id="liveAccuracy" class="text-teal-300 font-extrabold text-base sm:text-lg">100%</span>
+            </div>
+            <div class="text-center pl-2 border-l border-slate-800">
+                <span class="text-[10px] text-swimGold block uppercase tracking-wider"><i class="fa-solid fa-bolt"></i> Flow Streak</span>
+                <span id="liveStreak" class="text-amber-400 font-extrabold text-base sm:text-lg">0x</span>
+            </div>
+        </div>
+
+        <!-- CONTROL BUTTONS -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <button onclick="playWhistle(2)" class="p-2 sm:px-3 sm:py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold transition border border-amber-500/40 flex items-center gap-1.5" title="Blow Whistle">
+                <i class="fa-solid fa-bullhorn text-amber-400"></i> <span class="hidden sm:inline">Whistle</span>
+            </button>
+            <button id="soundToggleBtn" onclick="toggleAudio()" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-swimCyan transition border border-slate-700" title="Toggle Sound">
+                <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+            </button>
+            <button onclick="showLeaderboard()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-swimGold text-xs font-bold transition border border-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-trophy"></i> <span class="hidden sm:inline">Leaderboard</span>
+            </button>
+            <button onclick="resetToMenu()" class="px-3.5 py-2 rounded-lg bg-swimBlue-600 hover:bg-swimBlue-500 text-white font-bold text-xs transition shadow-md shadow-swimBlue-600/30 border border-swimBlue-400/40">
+                <i class="fa-solid fa-sliders mr-1"></i> Modules
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-1 flex flex-col max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-6">
+
+        <!-- MODULE SELECTOR SCREEN -->
+        <section id="setupPanel" class="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 sm:p-7 shadow-2xl backdrop-blur-md space-y-6">
+            <div class="border-b border-slate-800 pb-4 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-black text-white flex items-center gap-3">
+                        <i class="fa-solid fa-water-ladder text-swimGold"></i> Select Swim Skill Application Event
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-1">Select one of the 3 official SwimIQ modules to test your tactical, physical, and mathematical skill application.</p>
+                </div>
+                <div class="bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800 flex items-center gap-2 text-xs text-slate-300">
+                    <i class="fa-solid fa-medal text-swimGold text-base"></i>
+                    <span>Target Rank: <strong class="text-swimGold">All-American Swim Strategist</strong></span>
+                </div>
+            </div>
+
+            <!-- MODULE CARDS GRID (EXACTLY 3 MODULES) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                
+                <!-- MODULE 1 -->
+                <button onclick="selectModule('pacing')" id="mod-pacing" class="module-card p-5 rounded-2xl border border-swimBlue-500/80 bg-swimBlue-950/40 text-left transition flex flex-col justify-between space-y-4 hover:border-swimCyan group relative overflow-hidden">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-swimBlue-600/20 p-3.5 rounded-xl border border-swimBlue-500/40 text-swimCyan text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-stopwatch-20"></i>
+                        </div>
+                        <div>
+                            <span class="bg-swimCyan/20 text-swimCyan border border-swimCyan/40 text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase block w-fit mb-1">Game 1</span>
+                            <h3 class="font-bold text-lg text-slate-100 group-hover:text-swimCyan transition">Race Tactics & Pacing Strategy</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">Application of 50 Free sprint execution, 200 IM pacing transitions, 500 Free split management, stroke tempo shifts, and relay takeover timing.</p>
+                    <div class="pt-2 border-t border-slate-800/80 text-[11px] text-swimCyan font-semibold flex items-center gap-1">
+                        <span>Tactical Decision Sprint</span> <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                    </div>
+                </button>
+
+                <!-- MODULE 2 -->
+                <button onclick="selectModule('mechanics')" id="mod-mechanics" class="module-card p-5 rounded-2xl border border-slate-800 bg-slate-950/40 text-left transition flex flex-col justify-between space-y-4 hover:border-swimCyan group relative overflow-hidden">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-amber-500/20 p-3.5 rounded-xl border border-amber-500/40 text-amber-300 text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-person-swimming"></i>
+                        </div>
+                        <div>
+                            <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase block w-fit mb-1">Game 2</span>
+                            <h3 class="font-bold text-slate-100 group-hover:text-swimCyan transition text-lg">Technique & Mechanics Diagnostics</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">Diagnose stroke mechanics: high-elbow catch EVF, streamline kicks off turns, breaststroke kick/pull timing, backstroke rotation, and head position drag.</p>
+                    <div class="pt-2 border-t border-slate-800/80 text-[11px] text-amber-300 font-semibold flex items-center gap-1">
+                        <span>Biomechanics Analysis</span> <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                    </div>
+                </button>
+
+                <!-- MODULE 3 (NEW POOL MATH) -->
+                <button onclick="selectModule('math')" id="mod-math" class="module-card p-5 rounded-2xl border border-slate-800 bg-slate-950/40 text-left transition flex flex-col justify-between space-y-4 hover:border-swimCyan group relative overflow-hidden">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-teal-500/20 p-3.5 rounded-xl border border-teal-500/40 text-teal-300 text-2xl group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-calculator"></i>
+                        </div>
+                        <div>
+                            <span class="bg-teal-500/20 text-teal-300 border border-teal-500/40 text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase block w-fit mb-1">Game 3</span>
+                            <h3 class="font-bold text-slate-100 group-hover:text-swimCyan transition text-lg">Pool Math & Swimmer Analytics</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">Math in competitive swimming: interval pace calculations, SWOLF efficiency scores, target HR zones, Y2M conversions, dual meet scoring, & relay totals.</p>
+                    <div class="pt-2 border-t border-slate-800/80 text-[11px] text-teal-300 font-semibold flex items-center gap-1">
+                        <span>Quantitative Analytics</span> <i class="fa-solid fa-chevron-right text-[9px]"></i>
+                    </div>
+                </button>
+            </div>
+
+            <!-- START GAME ACTION BUTTON -->
+            <div class="pt-2 flex justify-end">
+                <button onclick="startEvent()" class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-swimBlue-600 via-swimCyan to-swimGold hover:from-swimBlue-500 hover:to-amber-300 text-slate-950 font-black text-lg rounded-xl shadow-lg shadow-swimBlue-600/30 uppercase tracking-wider transform transition active:scale-[0.98] flex items-center justify-center gap-3 border border-white/30">
+                    <i class="fa-solid fa-person-swimming"></i> Step Up To The Block & Dive In!
+                </button>
+            </div>
+        </section>
+
+        <!-- COUNTDOWN OVERLAY -->
+        <div id="countdownOverlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center">
+            <div class="text-swimCyan font-black text-2xl mb-2 flex items-center gap-2 animate-pulse">
+                <i class="fa-solid fa-bullhorn text-amber-400"></i> SWIMMERS ON YOUR MARKS...
+            </div>
+            <p class="text-slate-300 uppercase tracking-widest text-xs font-bold mb-4">Prepare For Swim Skill Application Sprint...</p>
+            <div id="countdownNumber" class="text-8xl font-black text-swimGold font-mono animate-bounce">3</div>
+            <p class="text-xs text-slate-500 mt-6">Correct tactical choices propel your swimmer forward!</p>
+        </div>
+
+        <!-- SIMULATOR ARENA -->
+        <section id="gameArena" class="hidden flex-1 flex flex-col space-y-5">
+            
+            <!-- ANIMATED POOL LANE VISUALIZATION -->
+            <div class="pool-water-bg rounded-2xl border-2 border-swimBlue-600/50 p-4 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+                <div class="water-shimmer"></div>
+
+                <!-- POOL DECK HEADER -->
+                <div class="relative z-10 flex justify-between items-center bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-700/60 backdrop-blur-sm">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-swimBlue-600 text-white p-2 rounded-lg shadow font-black text-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-flag-checkered text-swimGold"></i> LANE 4
+                        </div>
+                        <div>
+                            <span id="activeEventTitle" class="text-xs font-bold text-swimCyan block">EVENT: Race Tactics & Pacing Strategy</span>
+                            <span id="eventSubTitle" class="text-[10px] text-slate-400 font-mono">Lap 1 of 5 &bull; 100m Application Sprint</span>
+                        </div>
+                    </div>
+
+                    <!-- DIGITAL PACE CLOCK -->
+                    <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800 font-mono text-xs">
+                        <span class="text-slate-400">PACE:</span>
+                        <span id="arenaPaceClock" class="text-swimGold font-extrabold">00:00.0</span>
+                    </div>
+                </div>
+
+                <!-- POOL LANES TRACK -->
+                <div class="relative z-10 my-4 space-y-3">
+                    
+                    <!-- LANE 4: PLAYER SWIMMER -->
+                    <div class="relative">
+                        <div class="flex justify-between text-[10px] font-mono text-swimCyan mb-1 px-1">
+                            <span><i class="fa-solid fa-user-check text-swimCyan"></i> YOU (LANE 4 - APPLICANT)</span>
+                            <span id="playerDistanceText" class="font-bold text-swimCyan">0m / 100m Lap</span>
+                        </div>
+                        <div class="lane-rope my-1 rounded-full opacity-70"></div>
+                        <div class="relative h-12 w-full bg-slate-950/70 rounded-xl overflow-hidden border border-swimBlue-400/40 flex items-center px-2">
+                            <!-- Touchpad Finish Line -->
+                            <div class="absolute right-3 top-0 bottom-0 w-3 bg-amber-400 z-10 shadow-[0_0_12px_#ffd166] flex items-center justify-center">
+                                <i class="fa-solid fa-stopwatch text-[9px] text-slate-950"></i>
+                            </div>
+
+                            <!-- Player Swimmer Avatar -->
+                            <div id="playerSwimmer" class="absolute left-2 top-1/2 float-swimmer transition-all duration-500 flex items-center space-x-2" style="left: 0%;">
+                                <div class="bg-swimBlue-600 text-white font-black text-[10px] px-2.5 py-1 rounded-full shadow-md font-mono whitespace-nowrap flex items-center gap-1.5 border border-white/30">
+                                    <i class="fa-solid fa-person-swimming text-swimCyan text-xs"></i> YOU
+                                </div>
+                                <div id="playerSplash" class="hidden text-swimCyan text-sm splash-particle">
+                                    <i class="fa-solid fa-droplet"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lane-rope my-1 rounded-full opacity-70"></div>
+                    </div>
+
+                    <!-- LANE 3: RIVAL PACER SWIMMER -->
+                    <div class="relative opacity-75">
+                        <div class="flex justify-between text-[10px] font-mono text-slate-400 mb-1 px-1">
+                            <span><i class="fa-solid fa-stopwatch"></i> TARGET PACER (LANE 3)</span>
+                            <span id="aiDistanceText" class="font-bold text-slate-400">0m / 100m</span>
+                        </div>
+                        <div class="relative h-8 w-full bg-slate-950/40 rounded-lg overflow-hidden border border-slate-800 flex items-center px-2">
+                            <div id="aiSwimmer" class="absolute left-2 top-1/2 -translate-y-1/2 transition-all duration-500 flex items-center space-x-2" style="left: 0%;">
+                                <div class="bg-slate-700 text-slate-300 font-bold text-[9px] px-2 py-0.5 rounded-full shadow font-mono whitespace-nowrap">
+                                    Target Pacer
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- PROGRESS BAR -->
+                <div class="relative z-10 bg-slate-950/80 h-2 rounded-full overflow-hidden border border-slate-700">
+                    <div id="eventProgressBar" class="bg-gradient-to-r from-swimBlue-500 via-swimCyan to-swimGold h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- QUESTION / SCENARIO DECISION CARD -->
+            <div class="bg-slate-900 border-2 border-slate-800 focus-within:border-swimCyan rounded-2xl p-5 sm:p-7 shadow-2xl relative flex flex-col justify-between min-h-[310px]">
+                
+                <!-- QUESTION HEADER -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center text-xs font-mono">
+                        <span id="questionCategoryTag" class="bg-swimBlue-950 text-swimCyan border border-swimBlue-700 px-2.5 py-1 rounded-lg uppercase tracking-wider font-bold">
+                            Race Tactics
+                        </span>
+                        <span id="questionTracker" class="text-slate-400 font-bold">Scenario 1 of 5</span>
+                    </div>
+
+                    <h3 id="questionPrompt" class="text-base sm:text-xl font-bold text-white leading-snug">
+                        <!-- Injected prompt -->
+                    </h3>
+
+                    <!-- CONTEXT DIAGRAM / SCENARIO DETAILS BOX -->
+                    <div id="snippetBox" class="hidden p-3.5 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-amber-200">
+                        <!-- Injected detail -->
+                    </div>
+                </div>
+
+                <!-- OPTIONS CONTAINER -->
+                <div id="optionsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3 my-4">
+                    <!-- Injected option buttons -->
+                </div>
+
+                <!-- FEEDBACK & MECHANICAL EXPLANATION BANNER -->
+                <div id="feedbackBox" class="hidden p-4 rounded-xl border text-xs sm:text-sm font-sans flex flex-col space-y-2 animate-fade-in">
+                    <div class="flex items-center gap-2 font-bold text-sm">
+                        <i id="feedbackIcon" class="fa-solid"></i>
+                        <span id="feedbackTitle">Perfect Stroke Application!</span>
+                    </div>
+                    <p id="feedbackText" class="text-slate-300 leading-relaxed">
+                        Explanation details...
+                    </p>
+                    <div class="pt-2 flex justify-end">
+                        <button id="nextQuestionBtn" onclick="nextQuestion()" class="px-5 py-2 bg-swimBlue-600 hover:bg-swimBlue-500 text-white font-bold rounded-lg text-xs transition flex items-center gap-1.5 shadow">
+                            Next Application <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- RESULTS & DIAGNOSTICS SUMMARY PANEL -->
+        <section id="resultsPanel" class="hidden bg-slate-900/95 rounded-2xl border border-slate-800 p-6 shadow-2xl backdrop-blur-md space-y-6">
+            <div class="flex flex-wrap justify-between items-center border-b border-slate-800 pb-4 gap-4">
+                <div>
+                    <div id="resultBadge" class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-2">
+                        All-American Swim Strategist Rank
+                    </div>
+                    <h2 class="text-3xl font-black text-white">Swim Meet Touch Pad Results & Diagnostics</h2>
+                </div>
+                <button onclick="resetToMenu()" class="px-5 py-2.5 rounded-xl bg-swimBlue-600 hover:bg-swimBlue-500 text-white font-black text-sm transition shadow-lg shadow-swimBlue-600/30">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Next Swim Skill Module
+                </button>
+            </div>
+
+            <!-- PERFORMANCE METRICS CARDS -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Touch Time</span>
+                    <span id="resTime" class="text-3xl font-extrabold text-swimGold font-mono">00:00.0</span>
+                    <span class="text-xs text-slate-500 block">Pace Time</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Swim IQ Score</span>
+                    <span id="resScore" class="text-3xl font-extrabold text-swimCyan font-mono">0</span>
+                    <span class="text-xs text-slate-500 block">Points Earned</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Accuracy</span>
+                    <span id="resAccuracy" class="text-3xl font-extrabold text-teal-300 font-mono">100%</span>
+                    <span class="text-xs text-slate-500 block">Correct Choices</span>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                    <span class="text-xs text-slate-400 uppercase font-semibold block">Max Flow Streak</span>
+                    <span id="resStreak" class="text-3xl font-extrabold text-purple-400 font-mono">0x</span>
+                    <span class="text-xs text-slate-500 block">Consecutive Correct</span>
+                </div>
+            </div>
+
+            <!-- ANALYTICS CHART & BADGE -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-chart-line text-swimCyan"></i> Module Performance Breakdown</h3>
+                    <div class="h-60">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i class="fa-solid fa-award text-swimGold"></i> Earned Varsity Badge</h3>
+                        <div id="badgeContainer" class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-2">
+                            <div id="badgeIcon" class="text-4xl text-swimGold"><i class="fa-solid fa-trophy"></i></div>
+                            <div id="badgeTitle" class="font-extrabold text-white text-lg">All-American Swim Strategist</div>
+                            <p id="badgeDesc" class="text-xs text-slate-400">Mastered race tactics, biomechanics diagnostics, and quantitative pool math analytics.</p>
+                        </div>
+                    </div>
+
+                    <!-- SAVE SCORE FORM -->
+                    <div class="pt-2 border-t border-slate-800 space-y-2">
+                        <label class="block text-xs text-slate-400 font-bold uppercase">Save Swimmer Touch Time:</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="swimmerNameInput" placeholder="Swimmer Name / High School" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-swimCyan font-mono">
+                            <button onclick="saveSwimmerScore()" class="px-4 py-2 bg-swimBlue-600 hover:bg-swimBlue-500 text-white font-bold text-xs rounded-lg transition">Save Touch</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LEADERBOARD MODAL -->
+        <div id="leaderboardModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h3 class="text-xl font-extrabold text-swimGold flex items-center gap-2">
+                        <i class="fa-solid fa-trophy"></i> High School Leaderboard & Swim IQ
+                    </h3>
+                    <button onclick="hideLeaderboard()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+
+                <div class="overflow-y-auto max-h-80">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="text-slate-400 border-b border-slate-800 uppercase">
+                            <tr>
+                                <th class="p-2">#</th>
+                                <th class="p-2">Swimmer</th>
+                                <th class="p-2">Swim IQ</th>
+                                <th class="p-2">Accuracy</th>
+                                <th class="p-2">Touch Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardRows" class="divide-y divide-slate-800/50">
+                            <!-- Injected scores -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="hideLeaderboard()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-950 border-t border-slate-800/80 py-3 px-6 text-center text-xs text-slate-500 font-mono">
+        SwimIQ &bull; Interactive High School Swim Skills & Race Application Simulator
+    </footer>
+
+    <!-- GAME LOGIC & AUDIO SYNTHESIZER SCRIPT -->
+    <script>
+        /* ==========================================================================
+           1. QUESTION & SCENARIO DATABASE (EXACTLY 3 GAME MODULES)
+           ========================================================================== */
+        const GAME_MODULES = {
+            pacing: {
+                title: "Game 1: Race Tactics & Pacing Strategy",
+                subtitle: "Distance: 100m Tactical Decision Race",
+                category: "Race Tactics",
+                questions: [
+                    {
+                        prompt: "You are swimming the 200 Yard Butterfly. At turn 3 (125 yards), your shoulders and legs are burning intensely from lactic buildup. What is the most effective tactical adjustment to maintain pace without blowing out or getting disqualified?",
+                        snippet: "Scenario: 200 Fly • 3rd Turn (125y) • Lactic Acid Buildup",
+                        options: [
+                            "Maintain a powerful 6-beat underwater butterfly kick off the wall, extend stroke glide slightly, and focus on clean chest press",
+                            "Stop underwater kicks, surface immediately, and double-arm windmill as fast as possible without breathing",
+                            "Switch to single-arm butterfly strokes to rest one arm",
+                            "Slow down kick completely and take short, shallow strokes without turning head"
+                        ],
+                        correct: 0,
+                        explanation: "Underwater dolphin kicking off the wall uses core energy while avoiding surface drag. Extending the stroke glide slightly maintains velocity without causing early muscle failure."
+                    },
+                    {
+                        prompt: "In a 500 Yard Freestyle event, how should a swimmer's pacing strategy be structured across the 20 laps for an optimal target time?",
+                        snippet: "Strategy: 500 Free Pacing Matrix",
+                        options: [
+                            "Build first 50m, settle into a consistent threshold pace for middle 300m with a strong 6-beat kick finish over the last 150m",
+                            "Sprint 100% max speed for the first 150m and hold on as long as possible",
+                            "Swim as slowly as possible for 400m and sprint only the final 25m",
+                            "Change speed randomly every 50m to confuse competitors"
+                        ],
+                        correct: 0,
+                        explanation: "Holding even split times (e.g., 29.5 seconds per 50) conserves glycogen for a strong 6-beat kick finish in the final 150 yards."
+                    },
+                    {
+                        prompt: "During a 4x100 Freestyle Relay, what is the safest and fastest relay takeover technique on the starting block?",
+                        snippet: "Scenario: Relay Takeover Timing (NFHS / USA Swimming)",
+                        options: [
+                            "Begin windup step-drive so toes leave the block the exact instant the incoming swimmer touches the wall pad",
+                            "Wait until incoming swimmer touches wall, stand still for 1 second, then dive",
+                            "Jump off the block 0.5 seconds before the swimmer touches the wall",
+                            "Dive from a sitting position on the block side"
+                        ],
+                        correct: 0,
+                        explanation: "A legal relay exchange requires foot contact with the block until or at the moment the incoming swimmer touches the touchpad."
+                    },
+                    {
+                        prompt: "You are swimming the 200 Individual Medley (IM). What is the critical mechanical transition focus between the Backstroke to Breaststroke turn?",
+                        snippet: "Scenario: Back-to-Breast Flip/Crossover Turn Execution",
+                        options: [
+                            "Touch the wall on back, execute a tight crossover or bucket turn, and push off on breast back/side before rotating",
+                            "Turn onto stomach 2 yards before the wall without touching on back",
+                            "Grasp the lane line with both hands to turn around faster",
+                            "Execute a freestyle flip turn without touching the wall with hand or foot"
+                        ],
+                        correct: 0,
+                        explanation: "Rules require touching the wall while on the back before rotating onto the breast for push-off."
+                    },
+                    {
+                        prompt: "In a 50 Yard Freestyle sprint, how many breaths should a high school sprinter aim to take for peak velocity?",
+                        snippet: "Scenario: 50 Free Sprint Oxygen vs Drag Balance",
+                        options: [
+                            "0 to 2 breaths maximum (none on the first 25m, 1 on the return lap after breakout)",
+                            "Breathing every 2 strokes continuously throughout the entire race",
+                            "Breathing twice during underwater streamline",
+                            "Taking 10 deep breaths while underwater"
+                        ],
+                        correct: 0,
+                        explanation: "Breathing disrupts body line alignment and introduces drag. In a 50 Free sprint, restricting breaths maintains peak tempo and horizontal streamline."
+                    }
+                ]
+            },
+            mechanics: {
+                title: "Game 2: Technique & Mechanics Diagnostics",
+                subtitle: "Distance: 100m Stroke Biomechanics Sprint",
+                category: "Stroke Mechanics",
+                questions: [
+                    {
+                        prompt: "A swimmer notices their hips and legs sinking during freestyle, causing heavy lower-body water drag. What is the root biomechanical flaw and correction?",
+                        snippet: "Diagnostic: Sinking Lower Body Drag in Freestyle",
+                        options: [
+                            "Head position is lifted too high looking forward; correction is pressing head down so waterline hits mid-crown",
+                            "Kicking too fast with feet breaking water surface",
+                            "Pulling too hard with arms",
+                            "Wearing a silicone cap instead of latex"
+                        ],
+                        correct: 0,
+                        explanation: "The spine acts as a lever: lifting your head forces your hips and legs downward. Pressing your chest/head down lifts hips into a streamlined surface position."
+                    },
+                    {
+                        prompt: "In Freestyle, a coach points out that the swimmer is 'dropping their elbow' during the catch phase. Why does this reduce pull power and how is it fixed?",
+                        snippet: "Diagnostic: Dropped Elbow Catch Flaw",
+                        options: [
+                            "A dropped elbow slips through water without resistance; fix by establishing an Early Vertical Forearm (EVF) with high elbow anchor",
+                            "Dropped elbow makes you swim too fast; fix by dropping elbow further",
+                            "High elbow causes shoulder injury; fix by pulling with straight arm",
+                            "It reduces leg kick power; fix by kicking harder"
+                        ],
+                        correct: 0,
+                        explanation: "An Early Vertical Forearm (EVF) uses the forearm and hand as a paddle blade, keeping the elbow high to push water backward rather than downward."
+                    },
+                    {
+                        prompt: "During Breaststroke, why is extending the glide phase too short or skipping it altogether detrimental to stroke speed?",
+                        snippet: "Diagnostic: Breaststroke Timing & Glide Resistance",
+                        options: [
+                            "Breaststroke has the highest wave resistance; skipping the glide prevents taking advantage of the explosive underwater kick propulsion",
+                            "Skipping glide makes you glide too far underwater",
+                            "Glide is only used in warm-up, not in actual races",
+                            "Glide phase causes instant DQ from judges"
+                        ],
+                        correct: 0,
+                        explanation: "Breaststroke speed comes in bursts from the kick. Rushing into the next arm pull during peak velocity creates massive forward resistance."
+                    },
+                    {
+                        prompt: "In Backstroke, what causes excessive side-to-side snaking down the lane, and what stroke mechanic corrects it?",
+                        snippet: "Diagnostic: Backstroke Lateral Snaking",
+                        options: [
+                            "Crossing hand over head centerline on entry; fix by entering hand at 11 o'clock and 1 o'clock aligned with shoulders",
+                            "Rotating shoulders too much during pull",
+                            "Flutter kicking too deep underwater",
+                            "Looking straight up at the ceiling pool flags"
+                        ],
+                        correct: 0,
+                        explanation: "Crossing the hand past the head's centerline pulls the body sideways. Entering in line with the shoulders (11 & 1 o'clock) maintains straight trajectory."
+                    },
+                    {
+                        prompt: "Why is maintaining a tight streamline off every turn (hand over hand, head tucked, elbows locked) the fastest phase of any swim race?",
+                        snippet: "Diagnostic: Streamline Hydrodynamics",
+                        options: [
+                            "Underwater push-off velocity off the wall exceeds surface swimming speed; tight streamline minimizes frontal drag area",
+                            "Streamlining allows you to rest for 5 seconds without losing speed",
+                            "Swimmers swim slower underwater due to water density",
+                            "Streamline is required only in Backstroke turns"
+                        ],
+                        correct: 0,
+                        explanation: "Wall push-offs generate maximum kinetic energy. Streamlining creates the lowest possible drag profile to preserve wall velocity into the breakout."
+                    }
+                ]
+            },
+            math: {
+                title: "Game 3: Pool Math & Swimmer Analytics",
+                subtitle: "Distance: 100m Quantitative Swim Analytics Sprint",
+                category: "Pool Math",
+                questions: [
+                    {
+                        prompt: "A coach sets an interval set: 5 x 100 Yards on a 1:15 interval. If a swimmer wants a minimum of 12 seconds rest on each rep, what target split time must they hit?",
+                        snippet: "Math: Interval Pace = 1:15 (75 sec) • Target Rest = 12 sec",
+                        options: [
+                            "1:03.0 (63 seconds)",
+                            "1:08.0 (68 seconds)",
+                            "1:00.0 (60 seconds)",
+                            "1:05.0 (65 seconds)"
+                        ],
+                        correct: 0,
+                        explanation: "1:15 total interval = 75 seconds. Subtracting 12 seconds rest: 75s - 12s = 63s (1:03.0)."
+                    },
+                    {
+                        prompt: "Calculate a swimmer's SWOLF (Swim Golf) score for a 50-yard length if they complete the length in 28.5 seconds with 16 arm strokes.",
+                        snippet: "Math Formula: SWOLF = Time (sec) + Stroke Count",
+                        options: [
+                            "SWOLF Score = 44.5",
+                            "SWOLF Score = 42.0",
+                            "SWOLF Score = 45.5",
+                            "SWOLF Score = 12.5"
+                        ],
+                        correct: 0,
+                        explanation: "SWOLF measuring efficiency = Stroke Count + Time in seconds. 16 strokes + 28.5 seconds = 44.5 SWOLF."
+                    },
+                    {
+                        prompt: "In high school dual meets, individual event scoring awards: 1st (6 pts), 2nd (4 pts), 3rd (3 pts), 4th (2 pts), 5th (1 pt). If Team Blue finishes 1st, 3rd, and 4th, how many points do they earn?",
+                        snippet: "Math: Team Points = 1st (6) + 3rd (3) + 4th (2)",
+                        options: [
+                            "11 Points",
+                            "13 Points",
+                            "10 Points",
+                            "12 Points"
+                        ],
+                        correct: 0,
+                        explanation: "Sum of points = 6 (1st) + 3 (3rd) + 2 (4th) = 11 total points earned for Team Blue."
+                    },
+                    {
+                        prompt: "A swimmer needs to convert their 100-Yard Freestyle time of 54.0 seconds to an estimated 100-Meter time using the standard 1.11 conversion factor. What is their projected 100M time?",
+                        snippet: "Math Formula: Time in Meters = Time in Yards x 1.11",
+                        options: [
+                            "59.94 seconds (approx 59.9)",
+                            "57.20 seconds",
+                            "1:02.50 seconds",
+                            "55.50 seconds"
+                        ],
+                        correct: 0,
+                        explanation: "Yards to Meters conversion: 54.0 seconds x 1.11 = 59.94 seconds."
+                    },
+                    {
+                        prompt: "A 4x50 Free Relay team has individual 50 Free split targets: Swimmer A (23.8s), Swimmer B (24.2s), Swimmer C (24.0s), and Swimmer D (22.8s). Including 0.6s total saved on 3 rolling relay exchanges, what is the projected relay total?",
+                        snippet: "Math: Total Splits (94.8s) - 0.6s Relay Exchange Advantage",
+                        options: [
+                            "1:34.20 (94.2 seconds)",
+                            "1:34.80 (94.8 seconds)",
+                            "1:35.40 (95.4 seconds)",
+                            "1:33.60 (93.6 seconds)"
+                        ],
+                        correct: 0,
+                        explanation: "Sum of individual splits = 23.8 + 24.2 + 24.0 + 22.8 = 94.8s. Subtracting 0.6s exchange advantage = 94.2s (1:34.20)."
+                    }
+                ]
+            }
+        };
+
+        /* ==========================================================================
+           2. WEB AUDIO SYNTHESIZER ENGINE
+           ========================================================================== */
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            if (soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high';
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-500';
+            }
+        }
+
+        function playWhistle(blasts = 1) {
+            if (!soundEnabled) return;
+            initAudio();
+
+            for (let b = 0; b < blasts; b++) {
+                const startTime = audioCtx.currentTime + (b * 0.18);
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc1.type = 'square';
+                osc2.type = 'sawtooth';
+
+                osc1.frequency.setValueAtTime(3000, startTime);
+                osc2.frequency.setValueAtTime(3300, startTime);
+
+                gain.gain.setValueAtTime(0.08, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.12);
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc1.start(startTime);
+                osc2.start(startTime);
+                osc1.stop(startTime + 0.12);
+                osc2.stop(startTime + 0.12);
+            }
+        }
+
+        function playStarterHorn() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(480, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.32);
+
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.35);
+        }
+
+        function playSplashSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const bufferSize = audioCtx.sampleRate * 0.16;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1400, audioCtx.currentTime);
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.16);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        function playTouchChime() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(1320, audioCtx.currentTime + 0.08);
+
+            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.25);
+        }
+
+        function playErrorSound() {
+            if (!soundEnabled) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(190, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(120, audioCtx.currentTime + 0.12);
+
+            gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.28);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.28);
+        }
+
+        /* ==========================================================================
+           3. GAME STATE MANAGEMENT
+           ========================================================================== */
+        let gameState = {
+            activeModuleKey: 'pacing',
+            questions: [],
+            currentQuestionIdx: 0,
+            score: 0,
+            correctCount: 0,
+            errorCount: 0,
+            streak: 0,
+            maxStreak: 0,
+            startTime: null,
+            paceInterval: null,
+            playerProgress: 0,
+            aiProgress: 0,
+            aiInterval: null,
+            paceHistory: []
+        };
+
+        function selectModule(key) {
+            gameState.activeModuleKey = key;
+            document.querySelectorAll('.module-card').forEach(card => {
+                card.classList.remove('border-swimBlue-500/80', 'bg-swimBlue-950/40');
+                card.classList.add('border-slate-800', 'bg-slate-950/40');
+            });
+            const selected = document.getElementById(`mod-${key}`);
+            if (selected) {
+                selected.classList.remove('border-slate-800', 'bg-slate-950/40');
+                selected.classList.add('border-swimBlue-500/80', 'bg-swimBlue-950/40');
+            }
+        }
+
+        function startEvent() {
+            const modData = GAME_MODULES[gameState.activeModuleKey];
+            gameState.questions = [...modData.questions];
+            gameState.currentQuestionIdx = 0;
+            gameState.score = 0;
+            gameState.correctCount = 0;
+            gameState.errorCount = 0;
+            gameState.streak = 0;
+            gameState.maxStreak = 0;
+            gameState.playerProgress = 0;
+            gameState.aiProgress = 0;
+            gameState.paceHistory = [];
+
+            // UI Setup
+            document.getElementById('setupPanel').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.add('hidden');
+            document.getElementById('countdownOverlay').classList.remove('hidden');
+
+            let count = 3;
+            document.getElementById('countdownNumber').innerText = count;
+            playWhistle(1);
+
+            const cTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    document.getElementById('countdownNumber').innerText = count;
+                    playWhistle(1);
+                } else if (count === 0) {
+                    document.getElementById('countdownNumber').innerText = "TAKE YOUR MARKS!";
+                    playWhistle(2);
+                } else {
+                    clearInterval(cTimer);
+                    document.getElementById('countdownOverlay').classList.add('hidden');
+                    document.getElementById('gameArena').classList.remove('hidden');
+                    document.getElementById('liveStatsHeader').classList.remove('hidden');
+
+                    initActualGame();
+                }
+            }, 850);
+        }
+
+        function initActualGame() {
+            playStarterHorn();
+            gameState.startTime = Date.now();
+
+            const modData = GAME_MODULES[gameState.activeModuleKey];
+            document.getElementById('activeEventTitle').innerText = `EVENT: ${modData.title}`;
+            document.getElementById('eventSubTitle').innerText = `${modData.subtitle} • Scenario 1/${gameState.questions.length}`;
+
+            // Rival Pacer Swimmer movement loop
+            gameState.aiInterval = setInterval(() => {
+                if (gameState.aiProgress < 96) {
+                    gameState.aiProgress += 0.85;
+                    updateSwimmerPositions();
+                }
+            }, 1000);
+
+            // Digital Pace Clock loop
+            gameState.paceInterval = setInterval(updatePaceClock, 100);
+
+            renderCurrentQuestion();
+        }
+
+        function updatePaceClock() {
+            if (!gameState.startTime) return;
+            const elapsed = (Date.now() - gameState.startTime) / 1000;
+            const formatted = formatPaceTime(elapsed);
+            document.getElementById('paceClockDisplay').innerText = formatted;
+            document.getElementById('arenaPaceClock').innerText = formatted;
+
+            if (Math.floor(elapsed) % 2 === 0) {
+                gameState.paceHistory.push({ time: Math.round(elapsed), score: gameState.score });
+            }
+        }
+
+        function renderCurrentQuestion() {
+            const q = gameState.questions[gameState.currentQuestionIdx];
+            if (!q) {
+                finishEvent();
+                return;
+            }
+
+            document.getElementById('questionTracker').innerText = `Scenario ${gameState.currentQuestionIdx + 1} of ${gameState.questions.length}`;
+            document.getElementById('questionCategoryTag').innerText = GAME_MODULES[gameState.activeModuleKey].category;
+            document.getElementById('questionPrompt').innerText = q.prompt;
+
+            const snippetBox = document.getElementById('snippetBox');
+            if (q.snippet) {
+                snippetBox.classList.remove('hidden');
+                snippetBox.innerText = q.snippet;
+            } else {
+                snippetBox.classList.add('hidden');
+            }
+
+            // Hide feedback
+            document.getElementById('feedbackBox').classList.add('hidden');
+
+            // Render Option Buttons
+            const optsContainer = document.getElementById('optionsContainer');
+            optsContainer.innerHTML = '';
+
+            q.options.forEach((optText, optIdx) => {
+                const btn = document.createElement('button');
+                btn.className = 'opt-btn p-4 rounded-xl border border-slate-800 bg-slate-950/80 hover:border-swimCyan hover:bg-slate-900 text-left transition flex items-start gap-3 group text-xs sm:text-sm font-medium text-slate-200';
+                btn.onclick = () => handleAnswerSelect(optIdx);
+
+                btn.innerHTML = `
+                    <span class="w-6 h-6 rounded-lg bg-slate-800 text-slate-400 font-mono font-bold flex items-center justify-center text-xs group-hover:bg-swimCyan group-hover:text-slate-950 transition">
+                        ${String.fromCharCode(65 + optIdx)}
+                    </span>
+                    <span class="flex-1">${optText}</span>
+                `;
+                optsContainer.appendChild(btn);
+            });
+        }
+
+        function handleAnswerSelect(selectedIdx) {
+            const q = gameState.questions[gameState.currentQuestionIdx];
+            const isCorrect = selectedIdx === q.correct;
+
+            document.querySelectorAll('.opt-btn').forEach(btn => btn.disabled = true);
+
+            const feedbackBox = document.getElementById('feedbackBox');
+            const feedbackIcon = document.getElementById('feedbackIcon');
+            const feedbackTitle = document.getElementById('feedbackTitle');
+            const feedbackText = document.getElementById('feedbackText');
+
+            feedbackBox.classList.remove('hidden');
+
+            if (isCorrect) {
+                playSplashSound();
+                playTouchChime();
+                gameState.score += 200 + (gameState.streak * 30);
+                gameState.correctCount++;
+                gameState.streak++;
+                if (gameState.streak > gameState.maxStreak) gameState.maxStreak = gameState.streak;
+
+                // Move swimmer forward
+                gameState.playerProgress = Math.min(100, gameState.playerProgress + (100 / gameState.questions.length));
+
+                feedbackBox.className = "p-4 rounded-xl border text-xs sm:text-sm font-sans flex flex-col space-y-2 bg-teal-950/40 border-teal-500/60 text-teal-200";
+                feedbackIcon.className = "fa-solid fa-circle-check text-teal-400 text-base";
+                feedbackTitle.innerText = "POWERFUL APPLICATION! (Correct Response)";
+                
+                // Show splash effect
+                const splash = document.getElementById('playerSplash');
+                splash.classList.remove('hidden');
+                setTimeout(() => splash.classList.add('hidden'), 600);
+            } else {
+                playErrorSound();
+                gameState.errorCount++;
+                gameState.streak = 0;
+
+                // Drag swimmer back
+                const pSwimmer = document.getElementById('playerSwimmer');
+                pSwimmer.classList.add('drag-fx');
+                setTimeout(() => pSwimmer.classList.remove('drag-fx'), 400);
+
+                gameState.playerProgress = Math.max(0, gameState.playerProgress - 4);
+
+                feedbackBox.className = "p-4 rounded-xl border text-xs sm:text-sm font-sans flex flex-col space-y-2 bg-red-950/40 border-red-500/60 text-red-200";
+                feedbackIcon.className = "fa-solid fa-triangle-exclamation text-red-400 text-base";
+                feedbackTitle.innerText = "TECHNICAL RESISTANCE DRAG! (Incorrect Application)";
+            }
+
+            feedbackText.innerText = q.explanation;
+
+            updateSwimmerPositions();
+            updateLiveStatsUI();
+        }
+
+        function updateSwimmerPositions() {
+            const pSwimmer = document.getElementById('playerSwimmer');
+            pSwimmer.style.left = `${gameState.playerProgress * 0.88}%`;
+            document.getElementById('playerDistanceText').innerText = `${Math.round((gameState.playerProgress / 100) * 100)}m / 100m Lap`;
+
+            const aiSwimmer = document.getElementById('aiSwimmer');
+            aiSwimmer.style.left = `${gameState.aiProgress * 0.88}%`;
+            document.getElementById('aiDistanceText').innerText = `${Math.round((gameState.aiProgress / 100) * 100)}m / 100m`;
+
+            document.getElementById('eventProgressBar').style.width = `${gameState.playerProgress}%`;
+        }
+
+        function updateLiveStatsUI() {
+            document.getElementById('liveSwimIQ').innerText = gameState.score;
+            document.getElementById('liveStreak').innerText = `${gameState.streak}x`;
+
+            const totalAnswered = gameState.correctCount + gameState.errorCount;
+            const accuracy = totalAnswered > 0 ? Math.round((gameState.correctCount / totalAnswered) * 100) : 100;
+            document.getElementById('liveAccuracy').innerText = `${accuracy}%`;
+        }
+
+        function nextQuestion() {
+            gameState.currentQuestionIdx++;
+            if (gameState.currentQuestionIdx >= gameState.questions.length) {
+                finishEvent();
+            } else {
+                renderCurrentQuestion();
+            }
+        }
+
+        /* ==========================================================================
+           4. FINISH & POST-GAME DIAGNOSTICS
+           ========================================================================== */
+        function finishEvent() {
+            clearInterval(gameState.paceInterval);
+            clearInterval(gameState.aiInterval);
+            playWhistle(3);
+
+            const elapsedSec = (Date.now() - gameState.startTime) / 1000;
+            const totalAnswered = gameState.correctCount + gameState.errorCount;
+            const accuracy = totalAnswered > 0 ? Math.round((gameState.correctCount / totalAnswered) * 100) : 100;
+
+            document.getElementById('gameArena').classList.add('hidden');
+            document.getElementById('liveStatsHeader').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.remove('hidden');
+
+            document.getElementById('resTime').innerText = formatPaceTime(elapsedSec);
+            document.getElementById('resScore').innerText = gameState.score;
+            document.getElementById('resAccuracy').innerText = `${accuracy}%`;
+            document.getElementById('resStreak').innerText = `${gameState.maxStreak}x`;
+
+            // Earned Rank Badge
+            const badge = document.getElementById('resultBadge');
+            const badgeTitle = document.getElementById('badgeTitle');
+            const badgeDesc = document.getElementById('badgeDesc');
+            const badgeIcon = document.getElementById('badgeIcon');
+
+            if (accuracy >= 80 && gameState.score >= 800) {
+                badge.innerText = "★ All-American Swim Strategist";
+                badgeTitle.innerText = "All-American Swim Strategist";
+                badgeDesc.innerText = "Exceptional Swim IQ! Mastered race tactics, biomechanics diagnostics, and quantitative pool math calculations.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-trophy text-swimGold"></i>`;
+            } else if (accuracy >= 60) {
+                badge.innerText = "★ Varsity Swim Tactician";
+                badgeTitle.innerText = "Varsity Swim Tactician";
+                badgeDesc.innerText = "Solid understanding of race tactics, stroke mechanics, and pool math calculations.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-medal text-swimCyan"></i>`;
+            } else {
+                badge.innerText = "Junior Varsity Swimmer";
+                badgeTitle.innerText = "Junior Varsity Swimmer";
+                badgeDesc.innerText = "Developing practical swim skill application and race decision-making.";
+                badgeIcon.innerHTML = `<i class="fa-solid fa-shield text-slate-400"></i>`;
+            }
+
+            renderPerformanceChart();
+        }
+
+        let chartInstance = null;
+        function renderPerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            const labels = gameState.paceHistory.map(h => `${h.time}s`);
+            const data = gameState.paceHistory.map(h => h.score);
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Swim IQ Points',
+                        data: data,
+                        borderColor: '#22d3ee',
+                        backgroundColor: 'rgba(34, 211, 238, 0.12)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        /* LOCAL STORAGE LEADERBOARD */
+        function saveSwimmerScore() {
+            const name = document.getElementById('swimmerNameInput').value.trim() || 'Anonymous Swimmer';
+            const elapsed = (Date.now() - gameState.startTime) / 1000;
+            const timeStr = formatPaceTime(elapsed);
+            const score = gameState.score;
+            const accuracy = document.getElementById('resAccuracy').innerText;
+
+            const scores = JSON.parse(localStorage.getItem('swimIQScores') || '[]');
+            scores.push({ name, score, accuracy, timeStr, date: new Date().toLocaleDateString() });
+            scores.sort((a, b) => b.score - a.score);
+
+            localStorage.setItem('swimIQScores', JSON.stringify(scores.slice(0, 10)));
+            showLeaderboard();
+        }
+
+        function showLeaderboard() {
+            const scores = JSON.parse(localStorage.getItem('swimIQScores') || '[]');
+            const tbody = document.getElementById('leaderboardRows');
+            tbody.innerHTML = '';
+
+            if (scores.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No swim scores recorded yet!</td></tr>`;
+            } else {
+                scores.forEach((s, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = idx % 2 === 0 ? 'bg-slate-950/40' : '';
+                    tr.innerHTML = `
+                        <td class="p-2 font-bold text-swimGold">${idx + 1}</td>
+                        <td class="p-2 text-slate-200 font-bold">${s.name}</td>
+                        <td class="p-2 text-swimCyan font-extrabold">${s.score} pts</td>
+                        <td class="p-2 text-teal-300">${s.accuracy}</td>
+                        <td class="p-2 text-slate-400 font-mono">${s.timeStr}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById('leaderboardModal').classList.remove('hidden');
+        }
+
+        function hideLeaderboard() {
+            document.getElementById('leaderboardModal').classList.add('hidden');
+        }
+
+        function resetToMenu() {
+            clearInterval(gameState.paceInterval);
+            clearInterval(gameState.aiInterval);
+
+            document.getElementById('gameArena').classList.add('hidden');
+            document.getElementById('resultsPanel').classList.add('hidden');
+            document.getElementById('liveStatsHeader').classList.add('hidden');
+            document.getElementById('setupPanel').classList.remove('hidden');
+        }
+
+        function formatPaceTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 10);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms}`;
+        }
+    </script>
+</body>
+</html>
